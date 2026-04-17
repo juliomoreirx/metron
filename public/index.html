@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ONR — Sistema de Consulta de Indisponibilidades</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #0a0a0b;
+      --ink-2:      #141416;
+      --ink-3:      #1e1e22;
+      --surface:    #18181c;
+      --glass:      rgba(255,255,255,0.04);
+      --glass-b:    rgba(255,255,255,0.08);
+      --border:     rgba(255,255,255,0.08);
+      --border-h:   rgba(255,255,255,0.15);
+      --text:       #f0ede8;
+      --text-2:     #9a9690;
+      --text-3:     #5a5754;
+      --amber:      #d4a84b;
+      --amber-dim:  #a07a2e;
+      --amber-glow: rgba(212,168,75,0.15);
+      --red:        #c0392b;
+      --red-dim:    rgba(192,57,43,0.12);
+      --green:      #2ecc71;
+      --green-dim:  rgba(46,204,113,0.10);
+      --radius:     14px;
+      --radius-sm:  8px;
+      --trans:      cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--ink);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND TEXTURE ─────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 0%, rgba(212,168,75,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 100%, rgba(212,168,75,0.04) 0%, transparent 55%);
+      pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      background-size: 180px;
+      opacity: 0.5;
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────────── */
+    .app {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 680px;
+      padding: 48px 20px 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────── */
+    .header {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      animation: fadeUp 0.8s var(--trans) both;
+    }
+    .logo-mark {
+      width: 48px; height: 48px;
+      border: 1.5px solid var(--amber);
+      border-radius: 12px;
+      display: grid; place-items: center;
+      position: relative;
+      box-shadow: 0 0 24px var(--amber-glow), inset 0 0 16px rgba(212,168,75,0.05);
+    }
+    .logo-mark svg { width: 22px; height: 22px; color: var(--amber); }
+    .header-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px, 5vw, 38px);
+      letter-spacing: -0.5px;
+      color: var(--text);
+      line-height: 1;
+    }
+    .header-sub {
+      font-size: 13px;
+      color: var(--text-3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 400;
+    }
+    .header-divider {
+      width: 40px; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--amber), transparent);
+      margin-top: 4px;
+    }
+
+    /* ── CARD BASE ──────────────────────────────────────── */
+    .card {
+      width: 100%;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(20px);
+      overflow: hidden;
+      transition: border-color 0.3s var(--trans);
+      animation: fadeUp 0.8s var(--trans) 0.1s both;
+    }
+    .card:hover { border-color: var(--border-h); }
+
+    .card-header {
+      padding: 24px 28px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 18px;
+      color: var(--text);
+    }
+    .card-body { padding: 28px; }
+
+    /* ── FORM ELEMENTS ──────────────────────────────────── */
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 8px;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 12.5px;
+      font-weight: 300;
+      line-height: 1.7;
+      padding: 14px 16px;
+      resize: none;
+      outline: none;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    textarea::placeholder, input::placeholder { color: var(--text-3); }
+    textarea:focus, input:focus {
+      border-color: var(--amber-dim);
+      box-shadow: 0 0 0 3px var(--amber-glow);
+    }
+    textarea { rows: 6; min-height: 120px; }
+    input[type="text"] { font-family: 'DM Sans', sans-serif; font-size: 15px; letter-spacing: 0.02em; }
+
+    .field + .field { margin-top: 20px; }
+
+    /* ── BUTTONS ────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 24px;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      border: none;
+      transition: all 0.25s var(--trans);
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    .btn:hover::after { opacity: 1; }
+    .btn:active { transform: scale(0.985); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #b8892f 0%, #d4a84b 50%, #c49a3c 100%);
+      color: #0a0a0b;
+      font-weight: 600;
+      box-shadow: 0 4px 20px rgba(212,168,75,0.25), 0 1px 0 rgba(255,255,255,0.1) inset;
+    }
+    .btn-primary:hover {
+      box-shadow: 0 6px 28px rgba(212,168,75,0.4), 0 1px 0 rgba(255,255,255,0.1) inset;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--glass-b);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--border-h); background: rgba(255,255,255,0.07); }
+
+    .btn-ghost {
+      background: none;
+      color: var(--text-3);
+      font-size: 12px;
+      padding: 6px 10px;
+      width: auto;
+      border-radius: 6px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .btn-ghost:hover { color: var(--text-2); background: var(--glass); }
+
+    .btn .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(10,10,11,0.3);
+      border-top-color: #0a0a0b;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .btn.loading .spinner { display: block; }
+    .btn.loading .btn-label { opacity: 0.6; }
+
+    /* ── STATUS MESSAGE ──────────────────────────────────── */
+    .status-msg {
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      animation: fadeUp 0.3s var(--trans);
+    }
+    .status-msg.show { display: flex; }
+    .status-msg.error { background: var(--red-dim); color: #e74c3c; border: 1px solid rgba(192,57,43,0.25); }
+    .status-msg.success { background: var(--green-dim); color: #2ecc71; border: 1px solid rgba(46,204,113,0.2); }
+
+    /* ── SESSION BADGE ──────────────────────────────────── */
+    .session-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      color: var(--green);
+      background: var(--green-dim);
+      border: 1px solid rgba(46,204,113,0.2);
+      padding: 4px 10px;
+      border-radius: 100px;
+    }
+    .session-badge .dot {
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s ease infinite;
+    }
+
+    /* ── SEARCH PANEL ────────────────────────────────────── */
+    .search-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .search-row input { flex: 1; }
+    .search-row .btn-search {
+      width: auto;
+      padding: 14px 22px;
+      flex-shrink: 0;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #b8892f 0%, #d4a84b 100%);
+      color: #0a0a0b;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.25s var(--trans);
+      box-shadow: 0 4px 16px rgba(212,168,75,0.2);
+    }
+    .search-row .btn-search:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(212,168,75,0.35);
+    }
+    .search-row .btn-search:active { transform: scale(0.975); }
+
+    /* ── LOADING STATE ───────────────────────────────────── */
+    .loading-block {
+      padding: 48px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      display: none;
+    }
+    .loading-block.show { display: flex; }
+    .loader-ring {
+      width: 40px; height: 40px;
+      border: 2px solid var(--border);
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    .loading-block p { font-size: 13px; color: var(--text-3); letter-spacing: 0.05em; }
+
+    /* ── RESULT CARDS ────────────────────────────────────── */
+    .result-wrap {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeUp 0.6s var(--trans) both;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .verdict {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .verdict.neg { background: var(--green-dim); color: var(--green); border: 1px solid rgba(46,204,113,0.25); }
+    .verdict.pos { background: var(--red-dim); color: #e74c3c; border: 1px solid rgba(192,57,43,0.25); }
+    .verdict .v-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .person-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .person-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .person-doc {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--text-3);
+      letter-spacing: 0.08em;
+    }
+
+    /* NEGATIVE result */
+    .result-negative {
+      width: 100%;
+      background: var(--glass);
+      border: 1px solid rgba(46,204,113,0.15);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .check-icon {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--green-dim);
+      border: 1px solid rgba(46,204,113,0.3);
+      display: grid; place-items: center;
+    }
+    .check-icon svg { color: var(--green); width: 24px; }
+    .neg-message {
+      font-size: 13px;
+      color: var(--text-3);
+      line-height: 1.7;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    /* ORDER CARDS */
+    .orders-count {
+      font-size: 13px;
+      color: var(--text-3);
+    }
+    .orders-count strong { color: var(--text); font-weight: 500; }
+
+    .order-card {
+      width: 100%;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.25s, transform 0.25s var(--trans), box-shadow 0.25s;
+    }
+    .order-card:hover {
+      border-color: var(--border-h);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    }
+
+    .order-card-header {
+      padding: 16px 20px;
+      background: rgba(0,0,0,0.2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .protocol-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 2px;
+    }
+    .protocol-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--text);
+      letter-spacing: 0.03em;
+    }
+    .date-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 2px;
+      text-align: right;
+    }
+    .date-value {
+      font-size: 12px;
+      color: var(--text-2);
+      text-align: right;
+    }
+
+    .order-card-body {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 500px) { .order-card-body { grid-template-columns: 1fr; } }
+
+    .order-field { display: flex; flex-direction: column; gap: 4px; }
+    .order-field.full { grid-column: 1 / -1; }
+    .order-field-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+    .order-field-value {
+      font-size: 13.5px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* ORDER INDEX PILL */
+    .order-index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      background: var(--red-dim);
+      color: #e74c3c;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    /* ── INFO STRIP ──────────────────────────────────────── */
+    .info-strip {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11.5px;
+      color: var(--text-3);
+      padding: 14px 18px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      animation: fadeUp 0.8s var(--trans) 0.2s both;
+    }
+    .info-strip svg { color: var(--amber); flex-shrink: 0; }
+
+    /* ── FOOTER ──────────────────────────────────────────── */
+    .footer {
+      font-size: 11px;
+      color: var(--text-3);
+      text-align: center;
+      animation: fadeUp 0.8s var(--trans) 0.3s both;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── HIDDEN / VISIBLE ────────────────────────────────── */
+    .hidden { display: none !important; }
+
+    /* ── ANIMATIONS ──────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .stagger > * {
+      animation: slideIn 0.5s var(--trans) both;
+    }
+    .stagger > *:nth-child(1) { animation-delay: 0ms; }
+    .stagger > *:nth-child(2) { animation-delay: 60ms; }
+    .stagger > *:nth-child(3) { animation-delay: 120ms; }
+    .stagger > *:nth-child(4) { animation-delay: 180ms; }
+    .stagger > *:nth-child(5) { animation-delay: 240ms; }
+    .stagger > *:nth-child(6) { animation-delay: 300ms; }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <h1 class="header-title">ONR</h1>
+      <p class="header-sub">Sistema de Consulta de Indisponibilidades</p>
+      <div class="header-divider"></div>
+    </header>
+
+    <!-- INFO STRIP -->
+    <div class="info-strip">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Consultas realizadas em tempo real via API oficial do ONR. Autenticação via sessão protegida por cookie.
+    </div>
+
+    <!-- ══ TELA DE AUTENTICAÇÃO ══════════════════════════ -->
+    <div id="tela-config" class="card">
+      <div class="card-header">
+        <span class="card-title">Autenticação</span>
+        <span style="font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace;">SESSÃO REQUERIDA</span>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:24px;line-height:1.7;">
+          Exporte os cookies da sessão ativa no portal ONR utilizando a extensão <strong style="color:var(--text-2);">EditThisCookie</strong> e cole o JSON abaixo para autenticar.
+        </p>
+        <div class="field">
+          <label>Cookie JSON exportado</label>
+          <textarea id="cookieJson" placeholder='[{"name":"session","value":"..."}]'></textarea>
+        </div>
+        <div style="margin-top: 20px;">
+          <button class="btn btn-primary" id="btn-validar" onclick="validarCookies()">
+            <div class="spinner"></div>
+            <span class="btn-label">Validar e Iniciar Sessão</span>
+          </button>
+        </div>
+        <div id="msg-config" class="status-msg"></div>
+      </div>
+    </div>
+
+    <!-- ══ TELA DE PESQUISA ══════════════════════════════ -->
+    <div id="tela-pesquisa" class="card hidden">
+      <div class="card-header">
+        <div>
+          <span class="card-title">Consultar Documento</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="session-badge">
+            <span class="dot"></span>
+            Sessão Ativa
+          </div>
+          <button class="btn btn-ghost" onclick="sair()">Encerrar</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>CPF ou CNPJ</label>
+          <div class="search-row">
+            <input type="text" id="documento" placeholder="000.000.000-00 ou 00.000.000/0000-00" />
+            <button class="btn-search" id="btn-pesquisar" onclick="consultar()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Pesquisar
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading-block" class="loading-block">
+          <div class="loader-ring"></div>
+          <p>Consultando registros no ONR...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTADO ═════════════════════════════════════ -->
+    <div id="resultado" class="result-wrap" style="display:none;"></div>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      ONR — Operador Nacional do Registro de Imóveis &nbsp;·&nbsp; Uso restrito a profissionais autorizados
+    </footer>
+
+  </div>
+
+  <script>
+    "use strict";
+
+    // ─── INIT ────────────────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", () => {
+      if (localStorage.getItem("onr_cookies")) setAuthenticated(true);
+
+      document.getElementById("documento").addEventListener("keydown", e => {
+        if (e.key === "Enter") consultar();
+      });
+    });
+
+    // ─── UI HELPERS ──────────────────────────────────────────
+    function setAuthenticated(auth) {
+      document.getElementById("tela-config").classList.toggle("hidden", auth);
+      document.getElementById("tela-pesquisa").classList.toggle("hidden", !auth);
+      if (!auth) {
+        document.getElementById("resultado").style.display = "none";
+        document.getElementById("resultado").innerHTML = "";
+        document.getElementById("loading-block").classList.remove("show");
+      }
+    }
+
+    function showMsg(id, msg, type) {
+      const el = document.getElementById(id);
+      el.className = `status-msg show ${type}`;
+      el.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          ${type === "error"
+            ? '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
+            : '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'}
+        </svg>
+        ${msg}
+      `;
+    }
+
+    function hideMsg(id) {
+      document.getElementById(id).className = "status-msg";
+    }
+
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.classList.toggle("loading", loading);
+      btn.disabled = loading;
+    }
+
+    function setSearchLoading(active) {
+      const block = document.getElementById("loading-block");
+      block.classList.toggle("show", active);
+      const btn = document.getElementById("btn-pesquisar");
+      btn.disabled = active;
+      btn.style.opacity = active ? "0.5" : "1";
+    }
+
+    // ─── AUTH ────────────────────────────────────────────────
+    function sair() {
+      localStorage.removeItem("onr_cookies");
+      setAuthenticated(false);
+    }
+
+    async function validarCookies() {
+      const raw = document.getElementById("cookieJson").value.trim();
+      hideMsg("msg-config");
+
+      let cookieString;
+      try {
+        const arr = JSON.parse(raw);
+        if (!Array.isArray(arr)) throw new Error("Not array");
+        cookieString = arr.map(c => `${c.name}=${c.value}`).join("; ");
+      } catch {
+        showMsg("msg-config", "JSON inválido. Exporte corretamente via EditThisCookie.", "error");
+        return;
+      }
+
+      setLoading("btn-validar", true);
+
+      try {
+        const res = await fetch("/api/validar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cookies: cookieString }),
+        });
+        const data = await res.json();
+
+        if (res.ok && data.sucesso) {
+          localStorage.setItem("onr_cookies", cookieString);
+          document.getElementById("cookieJson").value = "";
+          setAuthenticated(true);
+        } else {
+          showMsg("msg-config", data.erro || "Sessão inválida. Verifique os cookies.", "error");
+        }
+      } catch {
+        showMsg("msg-config", "Erro de conexão com o servidor.", "error");
+      } finally {
+        setLoading("btn-validar", false);
+      }
+    }
+
+    // ─── CONSULTA ────────────────────────────────────────────
+    async function consultar() {
+      const doc = document.getElementById("documento").value.trim();
+      const cookies = localStorage.getItem("onr_cookies");
+      const resultDiv = document.getElementById("resultado");
+
+      if (!doc) {
+        document.getElementById("documento").focus();
+        return;
+      }
+      if (!cookies) return sair();
+
+      resultDiv.style.display = "none";
+      resultDiv.innerHTML = "";
+      setSearchLoading(true);
+
+      try {
+        const res = await fetch("/api/consultar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documento: doc, cookies }),
+        });
+
+        if (res.status === 401) {
+          renderError("Sessão expirada. Por favor, autentique novamente.");
+          setTimeout(sair, 2800);
+          return;
+        }
+        if (!res.ok) throw new Error("Server error");
+
+        const data = await res.json();
+        renderResult(data, doc);
+      } catch {
+        renderError("Falha de comunicação com o servidor. Verifique se o backend está ativo.");
+      } finally {
+        setSearchLoading(false);
+      }
+    }
+
+    // ─── RENDER ──────────────────────────────────────────────
+    function renderError(msg) {
+      const resultDiv = document.getElementById("resultado");
+      resultDiv.style.display = "flex";
+      resultDiv.innerHTML = `
+        <div style="
+          width:100%;padding:24px 20px;
+          background:var(--red-dim);
+          border:1px solid rgba(192,57,43,0.25);
+          border-radius:var(--radius);
+          display:flex;align-items:center;gap:12px;
+          font-size:13.5px;color:#e74c3c;
+        ">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          ${msg}
+        </div>
+      `;
+    }
+
+    function renderResult(data, rawDoc) {
+      const resultDiv = document.getElementById("resultado");
+      resultDiv.style.display = "flex";
+      resultDiv.className = "result-wrap";
+
+      const nome = (data.person?.currentPersonName)
+                || (data.hashResult?.personName)
+                || "Nome não disponibilizado";
+
+      const docFmt = data.person?.documentNumber || rawDoc;
+      const orders = data.orders || [];
+      const isNegative = orders.length === 0;
+
+      let html = `<div class="stagger" style="width:100%;display:flex;flex-direction:column;gap:16px;">`;
+
+      // ── HEADER ROW
+      html += `
+        <div class="result-header">
+          <div class="person-info">
+            <div class="person-name">${nome}</div>
+            <div class="person-doc">${docFmt}</div>
+          </div>
+          <div class="verdict ${isNegative ? "neg" : "pos"}">
+            <span class="v-dot"></span>
+            ${isNegative ? "Negativo" : "Positivo"}
+          </div>
+        </div>
+      `;
+
+      if (isNegative) {
+        // ── NEGATIVE
+        html += `
+          <div class="result-negative">
+            <div style="display:flex;align-items:center;gap:16px;">
+              <div class="check-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+              </div>
+              <div>
+                <div style="font-size:16px;font-weight:500;color:var(--text);margin-bottom:3px;">Nenhuma indisponibilidade encontrada</div>
+                <div style="font-size:13px;color:var(--text-3);">Consulta processada com sucesso.</div>
+              </div>
+            </div>
+            <div class="neg-message">
+              Não constam registros de indisponibilidade de bens no sistema ONR para o documento consultado na data de hoje.
+            </div>
+          </div>
+        `;
+      } else {
+        // ── POSITIVE — count
+        html += `
+          <div class="orders-count">
+            Foram encontradas <strong>${orders.length}</strong> indisponibilidade${orders.length > 1 ? "s" : ""} vinculada${orders.length > 1 ? "s" : ""} a este documento.
+          </div>
+        `;
+
+        // ── ORDER CARDS
+        orders.forEach((o, idx) => {
+          const dateFmt = o.createdOn && o.createdOn !== "0001-01-01T00:00:00"
+            ? new Date(o.createdOn).toLocaleString("pt-BR")
+            : "—";
+
+          html += `
+            <div class="order-card">
+              <div class="order-card-header">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div class="order-index">${String(idx + 1).padStart(2,"0")}</div>
+                  <div>
+                    <div class="protocol-label">Protocolo</div>
+                    <div class="protocol-value">${o.protocol || "—"}</div>
+                  </div>
+                </div>
+                <div>
+                  <div class="date-label">Data do Registro</div>
+                  <div class="date-value">${dateFmt}</div>
+                </div>
+              </div>
+              <div class="order-card-body">
+                <div class="order-field">
+                  <span class="order-field-label">Processo Original</span>
+                  <span class="order-field-value">${o.processNumber || "—"}</span>
+                </div>
+                <div class="order-field">
+                  <span class="order-field-label">Ação / Tipo</span>
+                  <span class="order-field-value">${o.processName || "—"}</span>
+                </div>
+                <div class="order-field full">
+                  <span class="order-field-label">Órgão Emissor</span>
+                  <span class="order-field-value">${o.organizationLabel || "—"}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      html += `</div>`;
+      resultDiv.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
