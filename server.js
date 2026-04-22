@@ -5,11 +5,7 @@ const cors       = require('cors');
 const axios      = require('axios');
 const FormData   = require('form-data');
 const path       = require('path');
-
-// Em produção (Render/Railway/etc) usa puppeteer-core + chromium serverless
-// Em desenvolvimento local usa o puppeteer normal (vem com Chrome embutido)
-const IS_PROD = !!(process.env.RENDER || process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production');
-const puppeteer = IS_PROD ? require('puppeteer-core') : require('puppeteer');
+const puppeteer  = require('puppeteer');
 
 const app = express();
 
@@ -83,18 +79,10 @@ async function popularSessaoBlazor(documento, cookieString) {
     (async () => {
         let browser;
         try {
-            // Em produção usa o Chromium serverless; localmente usa o Chrome do próprio puppeteer
-            let launchOptions = {
+            browser = await puppeteer.launch({
                 headless: 'new',
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-software-rasterizer'],
-            };
-            if (IS_PROD) {
-                const chromium = require('@sparticuz/chromium');
-                launchOptions.executablePath = await chromium.executablePath();
-                launchOptions.args           = [...chromium.args, '--disable-dev-shm-usage'];
-                launchOptions.defaultViewport = chromium.defaultViewport;
-            }
-            browser = await puppeteer.launch(launchOptions);
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+            });
 
             const page = await browser.newPage();
 
