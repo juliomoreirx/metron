@@ -236,9 +236,12 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .queue-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:100px;}
 .queue-status.pending{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(91,156,246,.2);}
 .queue-status.running{background:var(--amber-glow);color:var(--amber);border:1px solid rgba(212,168,75,.2);}
+.queue-status.gerando-pdf{background:rgba(180,130,255,0.12);color:#b47dff;border:1px solid rgba(180,130,255,0.25);}
+.queue-status.gerando-pdf .qs-spin{display:inline-block;}
 .queue-status.done-neg{background:var(--green-dim);color:var(--green);border:1px solid rgba(61,214,140,.2);}
 .queue-status.done-pos{background:var(--red-dim);color:var(--red);border:1px solid rgba(224,82,82,.2);}
 .queue-status.error{background:var(--red-dim);color:var(--red);}
+.qs-spin{width:10px;height:10px;border:1.5px solid rgba(180,130,255,0.3);border-top-color:#b47dff;border-radius:50%;animation:spin .7s linear infinite;display:none;flex-shrink:0;}
 .folder-row{display:flex;gap:8px;align-items:center;}
 .folder-display{flex:1;font-family:'DM Mono',monospace;font-size:12px;color:var(--text-2);background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 13px;min-height:42px;display:flex;align-items:center;}
 .progress-bar-wrap{width:100%;height:4px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px;display:none;}
@@ -1014,10 +1017,17 @@ async function mlRun() {
       // Atualiza nome na fila de execução
       const nomeEl = document.getElementById(`qn-exec-${item.id}`);
       if (nomeEl) nomeEl.textContent = nomeAPI;
+      // Marca resultado da busca (Positivo/Negativo) mas ainda não é o estado final
       if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
 
       // Aguarda sessão Blazor estar pronta para o PDF (o /api/consultar já disparou em background)
       try {
+        // Avisa o usuário que o PDF está sendo gerado
+        if (statusEl) {
+          statusEl.className = 'queue-status gerando-pdf';
+          statusEl.innerHTML = '<span class="qs-spin"></span>Gerando PDF...';
+        }
+
         // Polling no status até ficar ready (max 35s)
         let pdfReady = false;
         for (let t=0; t<35; t++) {
@@ -1041,7 +1051,13 @@ async function mlRun() {
             await writable.close();
           }
         }
-      } catch { /* PDF falhou — continua */ }
+
+        // Restaura badge de resultado após PDF (com ou sem sucesso)
+        if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
+      } catch {
+        // PDF falhou — restaura badge de resultado mesmo assim
+        if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
+      }
 
       addHistory(item.doc, data, item.pedido, feitoPor);
     } catch {
