@@ -290,6 +290,67 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .stagger>*{animation:fadeUp .45s var(--trans) both;}
 .stagger>*:nth-child(1){animation-delay:0ms}.stagger>*:nth-child(2){animation-delay:50ms}.stagger>*:nth-child(3){animation-delay:100ms}.stagger>*:nth-child(4){animation-delay:150ms}.stagger>*:nth-child(5){animation-delay:200ms}.stagger>*:nth-child(6){animation-delay:250ms}.stagger>*:nth-child(7){animation-delay:300ms}.stagger>*:nth-child(8){animation-delay:350ms}
+/* AUTH DIVIDER */
+.auth-divider{
+  display:flex;align-items:center;gap:12px;
+  margin:20px 0 16px;color:var(--text-3);font-size:12px;
+}
+.auth-divider::before,.auth-divider::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+
+/* PUBLISHER CARD */
+.publisher-card{
+  background:var(--card-bg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:14px;
+  transition:border-color .25s;
+}
+.publisher-card:hover{border-color:var(--border-h);}
+.publisher-header{display:flex;align-items:center;justify-content:space-between;}
+.publisher-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:var(--amber-glow);border:1px solid rgba(212,168,75,.2);
+  display:grid;place-items:center;color:var(--amber);flex-shrink:0;
+}
+.publisher-status-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--text-3);flex-shrink:0;transition:background .3s;
+}
+.publisher-status-dot.online{background:var(--green);box-shadow:0 0 6px rgba(61,214,140,.4);}
+.publisher-status-dot.offline{background:var(--text-3);}
+.publisher-status-dot.expired{background:var(--red);}
+
+/* SESSION EXPIRED OVERLAY */
+.session-expired-overlay{
+  position:fixed;inset:0;z-index:2000;
+  background:rgba(0,0,0,.75);
+  display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(6px);
+  animation:fadeIn .3s both;
+}
+.session-expired-overlay.show{display:flex;}
+.session-expired-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:32px 28px;
+  text-align:center;max-width:380px;width:90%;
+  box-shadow:var(--shadow);
+  animation:slideUp .35s var(--trans) both;
+}
+.session-expired-icon{
+  width:52px;height:52px;border-radius:50%;
+  background:var(--red-dim);border:1px solid rgba(224,82,82,.3);
+  display:grid;place-items:center;margin:0 auto 16px;
+}
+.session-expired-icon svg{color:var(--red);width:22px;}
+.session-expired-title{
+  font-family:'DM Serif Display',serif;font-size:20px;
+  color:var(--text);margin-bottom:8px;
+}
+.session-expired-msg{font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:22px;}
+.expired-countdown{
+  font-family:'DM Mono',monospace;font-size:13px;
+  color:var(--amber);margin-top:12px;
+}
 .hidden{display:none!important;}
 </style>
 </head>
@@ -339,6 +400,50 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
         </button>
       </div>
       <div id="msg-auth" class="status-msg"></div>
+
+      <!-- DIVISOR -->
+      <div class="auth-divider">
+        <span>ou</span>
+      </div>
+
+      <!-- PUBLISHER SYNC -->
+      <div id="publisher-section">
+        <div class="publisher-card" id="publisher-card">
+          <div class="publisher-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="publisher-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:var(--text);">Session Sync Pro</div>
+                <div style="font-size:11px;color:var(--text-3);">Usar cookie do Publisher</div>
+              </div>
+            </div>
+            <div class="publisher-status-dot" id="pub-dot" title="Verificando..."></div>
+          </div>
+
+          <div id="pub-info" style="display:none;margin-top:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:6px;">
+              <span>Expiração</span>
+              <span id="pub-expire" style="color:var(--text-2);font-family:'DM Mono',monospace;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:12px;">
+              <span>Cookies no pacote</span>
+              <span id="pub-count" style="color:var(--text-2);font-family:'DM Mono',monospace;">—</span>
+            </div>
+            <button class="btn btn-outline btn-full" id="btn-publisher" onclick="loginViaPublisher()">
+              <div class="spinner"></div>
+              <svg class="btn-label" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span class="btn-label">Injetar sessão do Publisher</span>
+            </button>
+          </div>
+
+          <div id="pub-unavailable" style="font-size:12px;color:var(--text-3);margin-top:8px;text-align:center;">
+            Verificando disponibilidade...
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -492,6 +597,18 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 <footer class="footer">ONR — Operador Nacional do Registro de Imóveis &nbsp;·&nbsp; Uso restrito a profissionais autorizados</footer>
 </div>
 
+<!-- SESSION EXPIRED OVERLAY -->
+<div class="session-expired-overlay" id="session-expired-overlay">
+  <div class="session-expired-box">
+    <div class="session-expired-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div class="session-expired-title">Sessão Expirada</div>
+    <div class="session-expired-msg">Sua sessão no ONR expirou ou foi encerrada. Você será redirecionado para a tela de login.</div>
+    <div class="expired-countdown" id="expired-countdown">Redirecionando em 3s...</div>
+  </div>
+</div>
+
 <!-- MODAL -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
   <div class="modal">
@@ -543,11 +660,178 @@ function setAuthenticated(auth) {
   document.getElementById('main-app').classList.toggle('hidden', !auth);
   document.getElementById('session-badge').classList.toggle('hidden', !auth);
   document.getElementById('btn-sair').style.display = auth ? '' : 'none';
+  // Ao mostrar o painel de auth, verifica se há sessão disponível no Publisher
+  if (!auth) verificarPublisher().catch(() => {});
 }
 
 function sair() {
   localStorage.removeItem('onr_cookies');
   setAuthenticated(false);
+}
+
+// ── SESSÃO EXPIRADA — redirect automático ──────────────────
+function sessaoExpirada() {
+  // Limpa dados
+  localStorage.removeItem('onr_cookies');
+  STATE.authenticated = false;
+
+  // Mostra overlay
+  const overlay   = document.getElementById('session-expired-overlay');
+  const countdown = document.getElementById('expired-countdown');
+  overlay.classList.add('show');
+
+  let secs = 3;
+  const tick = setInterval(() => {
+    secs--;
+    countdown.textContent = `Redirecionando em ${secs}s...`;
+    if (secs <= 0) {
+      clearInterval(tick);
+      overlay.classList.remove('show');
+      setAuthenticated(false);
+    }
+  }, 1000);
+}
+
+// ── FIREBASE / PUBLISHER ───────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:    'AIzaSyCLN4_OVUdgq4RPmPoPrxH6Ct0LQvN4O6o',
+  projectId: 'session-sync-pro-2b42b',
+};
+const REQUIRED_GROUPS = [
+  ['CNIB.Auth'], ['CNIB.AuthC1'], ['CNIB.AuthC2'], ['User','CNIB_USER']
+];
+const BLACKLIST = new Set(['_dd_s']);
+
+let _pubIdToken = '';
+let _pubIdTokenExp = 0;
+let _pubPayload = null; // payload mais recente do Firestore
+
+async function pubGetToken() {
+  if (_pubIdToken && _pubIdTokenExp > Date.now()) return _pubIdToken;
+  const r = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_CONFIG.apiKey}`,
+    { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ returnSecureToken: true }) }
+  );
+  const d = await r.json();
+  if (!d.idToken) throw new Error('Firebase auth falhou');
+  _pubIdToken    = d.idToken;
+  _pubIdTokenExp = Date.now() + (Number(d.expiresIn || 3600) - 30) * 1000;
+  return _pubIdToken;
+}
+
+function pubParseCookies(arrayValues) {
+  if (!Array.isArray(arrayValues)) return [];
+  return arrayValues.map(item => {
+    const f = item.mapValue?.fields || {};
+    return {
+      name:           f.name?.stringValue || '',
+      value:          f.value?.stringValue || '',
+      domain:         f.domain?.stringValue || '',
+      path:           f.path?.stringValue || '/',
+      httpOnly:       f.httpOnly?.booleanValue ?? false,
+      secure:         f.secure?.booleanValue ?? true,
+      sameSite:       f.sameSite?.stringValue || 'lax',
+      expirationDate: Number(f.expirationDate?.doubleValue || f.expirationDate?.integerValue || 0),
+    };
+  }).filter(c => c.name && !BLACKLIST.has(c.name));
+}
+
+function pubHasRequired(cookies) {
+  const names = new Set(cookies.map(c => c.name));
+  return REQUIRED_GROUPS.every(grp => grp.some(n => names.has(n)));
+}
+
+function pubCookiesToString(cookies) {
+  return cookies.map(c => `${c.name}=${c.value}`).join('; ');
+}
+
+async function pubFetchLatest() {
+  const token = await pubGetToken();
+  const url   = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/session_payloads?pageSize=5&orderBy=createdAt%20desc`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(`Firestore ${r.status}`);
+  const data = await r.json();
+  const docs = data.documents || [];
+  if (!docs.length) return null;
+
+  for (const doc of docs) {
+    const f       = doc.fields || {};
+    const domain  = f.domain?.stringValue || '';
+    const status  = f.status?.stringValue || '';
+    const expAt   = Number(f.expires_at?.integerValue || f.expireAt?.integerValue || 0);
+    const cookies = pubParseCookies(f.cookies?.arrayValue?.values || []);
+
+    if (domain !== 'indisponibilidade.onr.org.br') continue;
+    if (status !== 'ACTIVE') continue;
+    if (expAt <= Date.now()) continue;
+    if (!pubHasRequired(cookies)) continue;
+
+    return { cookies, expAt };
+  }
+  return null;
+}
+
+async function verificarPublisher() {
+  const dot         = document.getElementById('pub-dot');
+  const info        = document.getElementById('pub-info');
+  const unavailable = document.getElementById('pub-unavailable');
+
+  try {
+    const payload = await pubFetchLatest();
+    _pubPayload = payload;
+
+    if (!payload) {
+      dot.className = 'publisher-status-dot offline';
+      info.style.display = 'none';
+      unavailable.textContent = 'Nenhuma sessão disponível no Publisher.';
+      unavailable.style.display = 'block';
+      return;
+    }
+
+    // Sessão disponível
+    dot.className = 'publisher-status-dot online';
+    unavailable.style.display = 'none';
+    info.style.display = 'block';
+
+    const expDate = new Date(payload.expAt);
+    document.getElementById('pub-expire').textContent =
+      expDate.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    document.getElementById('pub-count').textContent = payload.cookies.length;
+
+  } catch {
+    dot.className = 'publisher-status-dot offline';
+    document.getElementById('pub-info').style.display = 'none';
+    document.getElementById('pub-unavailable').textContent = 'Erro ao verificar Publisher.';
+    document.getElementById('pub-unavailable').style.display = 'block';
+  }
+}
+
+async function loginViaPublisher() {
+  if (!_pubPayload) { showMsg('msg-auth', 'Nenhuma sessão do Publisher disponível.', 'error'); return; }
+  setBtnLoading('btn-publisher', true);
+  hideMsg('msg-auth');
+
+  try {
+    const cookieString = pubCookiesToString(_pubPayload.cookies);
+
+    // Valida no servidor igual ao fluxo normal
+    const r = await fetch('/api/validar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ cookies: cookieString })
+    });
+    const d = await r.json();
+
+    if (r.ok && d.sucesso) {
+      localStorage.setItem('onr_cookies', cookieString);
+      setAuthenticated(true);
+    } else {
+      showMsg('msg-auth', d.erro || 'Sessão do Publisher inválida ou expirada.', 'error');
+    }
+  } catch {
+    showMsg('msg-auth', 'Erro ao conectar com o servidor.', 'error');
+  } finally {
+    setBtnLoading('btn-publisher', false);
+  }
 }
 
 async function validarCookies() {
@@ -632,7 +916,7 @@ async function consultar() {
   const cookies  = localStorage.getItem('onr_cookies');
   if (!raw) { input.focus(); return; }
   if (!validateDocInput(input,'search')) { showMsg('msg-pesquisa','Documento inválido.','error'); return; }
-  if (!cookies) { sair(); return; }
+  if (!cookies) { sessaoExpirada(); return; }
   hideMsg('msg-pesquisa');
 
   const pedido   = document.getElementById('pedido-single').value.trim();
@@ -661,7 +945,7 @@ async function _doConsulta(doc, cookies, attempt, pedido='', feitoPor='') {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({documento:doc, cookies})
     });
-    if (res.status===401) { lb.classList.remove('show'); showMsg('msg-pesquisa','Sessão expirada.','error'); setTimeout(sair,2500); return; }
+    if (res.status===401) { lb.classList.remove('show'); showMsg('msg-pesquisa','Sessão expirada.','error'); setTimeout(sessaoExpirada, 1500); return; }
     if (!res.ok) throw new Error('Server');
     const data = await res.json();
 
@@ -966,7 +1250,7 @@ async function mlRun() {
   if (!feitoPor) { showMsg('msg-ml','Informe o operador responsável.','error'); return; }
   if (!STATE.selectedFolderHandle) { showMsg('msg-ml','Selecione a pasta de destino.','warn'); return; }
   const cookies = localStorage.getItem('onr_cookies');
-  if (!cookies) { sair(); return; }
+  if (!cookies) { sessaoExpirada(); return; }
 
   STATE.mlRunning = true;
   hideMsg('msg-ml');
@@ -1006,7 +1290,10 @@ async function mlRun() {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({documento:item.doc, cookies})
       });
-      if (!res.ok) throw new Error('API');
+      if (!res.ok) {
+        if (res.status === 401) { sessaoExpirada(); return; }
+        throw new Error('API');
+      }
       const data = await res.json();
 
       const nomeAPI = data.person?.currentPersonName || data.hashResult?.personName || item.doc;
