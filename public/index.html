@@ -649,10 +649,17 @@ function toggleTheme() {
 
 // ── AUTH ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  if (localStorage.getItem('onr_cookies')) setAuthenticated(true);
   purgeExpiredHistory();
   renderHistoryList();
+  if (localStorage.getItem('onr_cookies')) {
+    setAuthenticated(true);
+  } else {
+    // Não há sessão — mostra painel de auth e inicia verificação do Publisher
+    setAuthenticated(false);
+  }
 });
+
+let _pubPollInterval = null;
 
 function setAuthenticated(auth) {
   STATE.authenticated = auth;
@@ -660,8 +667,28 @@ function setAuthenticated(auth) {
   document.getElementById('main-app').classList.toggle('hidden', !auth);
   document.getElementById('session-badge').classList.toggle('hidden', !auth);
   document.getElementById('btn-sair').style.display = auth ? '' : 'none';
-  // Ao mostrar o painel de auth, verifica se há sessão disponível no Publisher
-  if (!auth) verificarPublisher().catch(() => {});
+
+  if (!auth) {
+    // Verifica imediatamente e depois a cada 30s enquanto no painel de auth
+    verificarPublisher().catch(() => {});
+    if (!_pubPollInterval) {
+      _pubPollInterval = setInterval(() => {
+        // Só continua polling se ainda está no painel de auth
+        if (!STATE.authenticated) {
+          verificarPublisher().catch(() => {});
+        } else {
+          clearInterval(_pubPollInterval);
+          _pubPollInterval = null;
+        }
+      }, 30000);
+    }
+  } else {
+    // Autenticado — para o polling do Publisher
+    if (_pubPollInterval) {
+      clearInterval(_pubPollInterval);
+      _pubPollInterval = null;
+    }
+  }
 }
 
 function sair() {
@@ -1054,12 +1081,16 @@ async function pollPDFStatus() {
   if (!indicator) return;
 
   const cookies = localStorage.getItem('onr_cookies');
-  const maxWait = 40; // max 40 iterações × 1s = 40s
+  const maxWait = 50; // max 50 iterações × 1s = 50s
   let tries = 0;
+  let notStartedCount = 0;
 
   while (tries < maxWait) {
     await delay(1000);
     tries++;
+    // Para o polling se o resultado foi substituído por nova pesquisa
+    if (!document.getElementById('pdf-indicator')) return;
+
     try {
       const r = await fetch('/api/pdf/status', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -1067,7 +1098,7 @@ async function pollPDFStatus() {
       });
       const d = await r.json();
 
-      if (!document.getElementById('pdf-indicator')) return; // resultado foi substituído
+      if (!document.getElementById('pdf-indicator')) return;
 
       if (d.status === 'ready') {
         indicator.classList.add('done');
@@ -1079,9 +1110,21 @@ async function pollPDFStatus() {
         indicator.classList.remove('show');
         return;
       }
-      // still preparing
+      if (d.status === 'not_started') {
+        // Ainda não iniciou — espera até 5s antes de desistir
+        notStartedCount++;
+        if (notStartedCount >= 5) {
+          // Sessão Blazor nunca foi iniciada (provavelmente falha no servidor)
+          indicator.classList.remove('show');
+          return;
+        }
+        if (indText) indText.textContent = 'Aguardando início da preparação...';
+        continue;
+      }
+      // status === 'preparing'
+      notStartedCount = 0;
       if (indText) indText.textContent = `Preparando PDF em background... (${tries}s)`;
-    } catch { /* ignora */ }
+    } catch { /* ignora erros de rede durante polling */ }
   }
   // Timeout — esconde o indicador silenciosamente
   if (indicator) indicator.classList.remove('show');

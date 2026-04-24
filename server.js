@@ -142,12 +142,33 @@ async function popularSessaoBlazor(documento, cookieString) {
     const promise = new Promise((res, rej) => { resolveFn = res; rejectFn = rej; });
     blazorSessions.set(key, { promise, status: 'running', resolveFn, rejectFn });
 
-    console.log(`\n[BLAZOR] Iniciando para doc ${documento.replace(/\D/g,'').slice(0,3)}***`);
+    const docMasked = documento.replace(/\D/g,'').slice(0,3) + '***';
+    console.log(`\n[BLAZOR] Iniciando para doc ${docMasked}`);
 
     (async () => {
         let page;
         try {
-            const browser = await getBrowser();
+            let browser;
+            try {
+                browser = await getBrowser();
+            } catch (launchErr) {
+                console.error('[BLAZOR] ✗ FALHA AO ABRIR BROWSER (Puppeteer):');
+                console.error('  → Mensagem:', launchErr.message);
+                if (launchErr.message.includes('Could not find') || launchErr.message.includes('No usable sandbox')) {
+                    console.error('  → CAUSA PROVÁVEL: Chrome/Chromium não está instalado.');
+                    console.error('  → SOLUÇÃO: Execute "npx puppeteer browsers install chrome" ou instale o Chromium:');
+                    console.error('             sudo apt-get install -y chromium-browser');
+                } else if (launchErr.message.includes('EACCES') || launchErr.message.includes('permission')) {
+                    console.error('  → CAUSA PROVÁVEL: Permissão negada ao executável do Chrome.');
+                    console.error('  → SOLUÇÃO: chmod +x no binário do Chrome, ou rode sem --no-sandbox com cautela.');
+                } else if (launchErr.message.includes('ENOMEM') || launchErr.message.includes('out of memory')) {
+                    console.error('  → CAUSA PROVÁVEL: Memória insuficiente no servidor.');
+                    console.error('  → SOLUÇÃO: Aumente a RAM ou reduza BROWSER_RECYCLE_AFTER.');
+                } else {
+                    console.error('  → Stack:', launchErr.stack);
+                }
+                throw launchErr;
+            }
             browserUseCount++;
 
             page = await browser.newPage();
@@ -172,10 +193,41 @@ async function popularSessaoBlazor(documento, cookieString) {
 
             await page.setCookie(...cookieArray);
 
-            await page.goto(
-                'https://indisponibilidade.onr.org.br/ordem/consulta/simplificada',
-                { waitUntil: 'networkidle2', timeout: 45000 }
-            );
+            let gotoOk = false;
+            try {
+                await page.goto(
+                    'https://indisponibilidade.onr.org.br/ordem/consulta/simplificada',
+                    { waitUntil: 'networkidle2', timeout: 45000 }
+                );
+                gotoOk = true;
+            } catch (navErr) {
+                console.error('[BLAZOR] ✗ FALHA AO NAVEGAR PARA A PÁGINA:');
+                console.error('  → Mensagem:', navErr.message);
+                if (navErr.message.includes('net::ERR_NAME_NOT_RESOLVED') || navErr.message.includes('getaddrinfo')) {
+                    console.error('  → CAUSA PROVÁVEL: Sem acesso à internet ou DNS falhou.');
+                    console.error('  → SOLUÇÃO: Verifique a conectividade do servidor VPS com curl https://indisponibilidade.onr.org.br');
+                } else if (navErr.message.includes('net::ERR_CONNECTION_REFUSED')) {
+                    console.error('  → CAUSA PROVÁVEL: Servidor ONR recusou a conexão.');
+                } else if (navErr.message.includes('timeout')) {
+                    console.error('  → CAUSA PROVÁVEL: Timeout ao carregar a página (networkidle2 > 45s).');
+                    console.error('  → SOLUÇÃO: Tente aumentar o timeout ou checar a latência da VPS com o ONR.');
+                } else if (navErr.message.includes('net::ERR_CERT') || navErr.message.includes('SSL')) {
+                    console.error('  → CAUSA PROVÁVEL: Problema de certificado SSL.');
+                    console.error('  → SOLUÇÃO: Adicione --ignore-certificate-errors nos args do Puppeteer (temporário).');
+                }
+                throw navErr;
+            }
+
+            // Verifica se o cookie foi aceito (página pode redirecionar p/ login)
+            const currentUrl = page.url();
+            if (!currentUrl.includes('/ordem/consulta')) {
+                const pageTitle = await page.title().catch(() => '?');
+                console.error(`[BLAZOR] ✗ REDIRECIONADO PARA URL INESPERADA: ${currentUrl}`);
+                console.error(`  → Título da página: "${pageTitle}"`);
+                console.error('  → CAUSA PROVÁVEL: Cookie expirado ou rejeitado pelo ONR (sessão inválida).');
+                console.error('  → SOLUÇÃO: Renove o cookie no Publisher ou via EditThisCookie.');
+                throw new Error(`Redirecionado para ${currentUrl} — cookie pode estar inválido`);
+            }
             console.log('[BLAZOR] Página carregada');
 
             const inputsInfo = await page.evaluate(() =>
@@ -203,7 +255,13 @@ async function popularSessaoBlazor(documento, cookieString) {
                 } catch { /* tenta próximo */ }
             }
 
-            if (!inputHandle) throw new Error('Campo CPF/CNPJ não encontrado na página');
+            if (!inputHandle) {
+                console.error('[BLAZOR] ✗ CAMPO CPF/CNPJ NÃO ENCONTRADO NA PÁGINA:');
+                console.error('  → Inputs encontrados:', JSON.stringify(inputsInfo));
+                console.error('  → CAUSA PROVÁVEL: ONR mudou o layout da página, ou a sessão foi redirecionada.');
+                console.error('  → SOLUÇÃO: Inspecione a URL atual e o HTML da página via Puppeteer para atualizar os seletores.');
+                throw new Error('Campo CPF/CNPJ não encontrado na página');
+            }
 
             const docRaw = documento.replace(/\D/g, '');
             await inputHandle.click({ clickCount: 3 });
@@ -358,7 +416,8 @@ app.post('/api/pdf', async (req, res) => {
 
         const buffer = Buffer.from(pdfRes.data);
         const magic  = buffer.slice(0, 4).toString('ascii');
-        console.log(`[PDF] ${pdfRes.status}, ${buffer.length}b, magic:"${magic}"`);
+        const contentType = pdfRes.headers['content-type'] || '';
+        console.log(`[PDF] HTTP ${pdfRes.status} | ${buffer.length} bytes | magic:"${magic}" | content-type:"${contentType}"`);
 
         if (magic === '%PDF') {
             res.set('Content-Type', 'application/pdf');
@@ -366,12 +425,38 @@ app.post('/api/pdf', async (req, res) => {
             return res.send(buffer);
         }
 
-        const text = buffer.toString('utf8');
+        // Não é PDF — tenta entender o que voltou
+        const text = buffer.toString('utf8').slice(0, 800);
+        console.error('[PDF] ✗ RESPOSTA NÃO É UM PDF:');
+        console.error(`  → HTTP Status: ${pdfRes.status}`);
+        console.error(`  → Content-Type: ${contentType}`);
+        console.error(`  → Tamanho: ${buffer.length} bytes`);
+        console.error(`  → Início do conteúdo: ${text.replace(/\s+/g,' ').slice(0,300)}`);
+
+        if (pdfRes.status === 302 || (contentType.includes('text/html') && text.toLowerCase().includes('<html'))) {
+            const hasLoginKeyword = text.toLowerCase().includes('login') || text.toLowerCase().includes('entrar') || text.toLowerCase().includes('senha');
+            if (hasLoginKeyword) {
+                console.error('  → CAUSA PROVÁVEL: Cookie expirado. ONR redirecionou para a tela de login.');
+                console.error('  → SOLUÇÃO: Renove a sessão no Publisher ou cole um novo cookie.');
+                return res.status(401).json({ erro: 'Sessão expirada. Faça login novamente e refaça a pesquisa.' });
+            }
+            console.error('  → CAUSA PROVÁVEL: Sessão Blazor não foi populada corretamente (página não fez a consulta).');
+            console.error('  → SOLUÇÃO: Refaça a pesquisa do documento e aguarde o indicador "PDF pronto" antes de baixar.');
+            return res.status(500).json({ erro: 'PDF não gerado: sessão não estava preparada. Refaça a pesquisa.' });
+        }
+
         if (text.includes('erro ao gerar') || text.includes('Verifique os parametros') || text.includes('Ocorreu um erro')) {
+            console.error('  → CAUSA PROVÁVEL: ONR retornou mensagem de erro explícita no corpo da resposta.');
             return res.status(500).json({ erro: 'ONR retornou erro ao gerar o relatório. Refaça a pesquisa.' });
         }
 
-        return res.status(500).json({ erro: `PDF não reconhecido (${buffer.length} bytes).` });
+        if (buffer.length < 500) {
+            console.error('  → CAUSA PROVÁVEL: Resposta muito pequena — pode ser uma resposta vazia ou de sessão inválida.');
+            return res.status(500).json({ erro: `Resposta inválida do ONR (${buffer.length} bytes). Refaça a pesquisa.` });
+        }
+
+        console.error('  → CAUSA DESCONHECIDA. Verifique o log acima para mais detalhes.');
+        return res.status(500).json({ erro: `PDF não reconhecido (${buffer.length} bytes). Veja o log do servidor.` });
 
     } catch (err) {
         if (err.message === 'timeout') return res.status(504).json({ erro: 'Timeout aguardando PDF.' });
