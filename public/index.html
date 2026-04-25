@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR" data-theme="dark" data-pdf-mode="oficial">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
@@ -248,8 +248,24 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .progress-bar-wrap.show{display:block;}
 .progress-bar{height:100%;background:var(--amber-btn);border-radius:4px;transition:width .4s var(--trans);width:0%;}
 
-/* HISTORY */
-.history-list{display:flex;flex-direction:column;gap:8px;}
+/* PDF MODE SWITCH */
+.pdf-mode-switch{display:flex;align-items:center;gap:7px;user-select:none;}
+.pms-track{width:42px;height:22px;border-radius:11px;background:var(--tab-bg);border:1px solid var(--border);cursor:pointer;position:relative;transition:background .25s,border-color .25s;flex-shrink:0;}
+.pms-track:hover{border-color:var(--border-h);}
+.pms-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--amber);transition:transform .25s var(--trans),background .25s;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+.pms-label{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);transition:color .2s;white-space:nowrap;}
+.pms-label.active{color:var(--amber);}
+[data-pdf-mode="clone"] .pms-thumb{transform:translateX(20px);}
+[data-pdf-mode="clone"] #pms-label-clone{color:var(--amber);}
+[data-pdf-mode="clone"] #pms-label-oficial{color:var(--text-3);}
+[data-pdf-mode="oficial"] #pms-label-oficial{color:var(--amber);}
+
+/* EDIT MODAL */
+.edit-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;}
+.edit-modal-overlay.show{display:flex;}
+.edit-modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:min(420px,92vw);display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow);}
+.edit-modal-title{font-family:'DM Serif Display',serif;font-size:17px;color:var(--text);}
+.edit-modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
 .history-item{display:flex;align-items:center;gap:12px;padding:13px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-sm);transition:border-color .2s;}
 .history-item:hover{border-color:var(--border-h);}
 .hist-doc{font-family:'DM Mono',monospace;font-size:13px;color:var(--amber);flex-shrink:0;}
@@ -472,6 +488,29 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
     <div class="card">
       <div class="card-header">
         <span class="card-title">Consultar Documento</span>
+        <!-- Feature 1: pasta de destino + Feature 4: switch OFICIAL/CLONE -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <!-- PDF Mode switch -->
+          <div class="pdf-mode-switch" id="pdf-mode-switch" title="OFICIAL: baixa o PDF do ONR. CLONE: gera PDF local idêntico.">
+            <span class="pms-label" id="pms-label-oficial">OFICIAL</span>
+            <div class="pms-track" onclick="togglePdfMode()">
+              <div class="pms-thumb" id="pms-thumb"></div>
+            </div>
+            <span class="pms-label" id="pms-label-clone">CLONE</span>
+          </div>
+          <!-- Pasta destino pesquisa única -->
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="folder-display" id="single-folder-display" style="font-size:11.5px;padding:7px 11px;min-height:0;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default;" title="Auto-download para esta pasta">
+              Sem pasta
+            </div>
+            <button class="btn btn-icon" onclick="selectSingleFolder()" title="Definir pasta de auto-download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </button>
+            <button class="btn btn-icon" id="btn-clear-folder" onclick="clearSingleFolder()" title="Remover pasta" style="display:none;color:var(--text-3);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="card-body">
 
@@ -597,6 +636,27 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 <footer class="footer">ONR — Operador Nacional do Registro de Imóveis &nbsp;·&nbsp; Uso restrito a profissionais autorizados</footer>
 </div>
 
+<!-- EDIT ITEM MODAL (lote) -->
+<div class="edit-modal-overlay" id="edit-modal-overlay" onclick="if(event.target===this)closeEditModal()">
+  <div class="edit-modal">
+    <div class="edit-modal-title">Editar Item</div>
+    <input type="hidden" id="edit-item-id"/>
+    <div class="field">
+      <label class="flabel">Nº Pedido</label>
+      <input type="text" id="edit-pedido" placeholder="Ex: 4203"/>
+    </div>
+    <div class="field">
+      <label class="flabel">CPF / CNPJ</label>
+      <input type="text" id="edit-doc" class="input-doc" placeholder="000.000.000-00" maxlength="18" oninput="maskDoc(this,'edit')"/>
+      <div id="doc-hint-edit" class="doc-hint">Documento inválido.</div>
+    </div>
+    <div class="edit-modal-footer">
+      <button class="btn btn-outline" onclick="closeEditModal()">Cancelar</button>
+      <button class="btn btn-amber" onclick="saveEditItem()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- SESSION EXPIRED OVERLAY -->
 <div class="session-expired-overlay" id="session-expired-overlay">
   <div class="session-expired-box">
@@ -635,6 +695,8 @@ const STATE = {
   mlRunning: false,
   mlLocked: false,
   selectedFolderHandle: null,
+  singleFolderHandle: null,
+  pdfMode: 'oficial',
   history: [],
 };
 
@@ -646,6 +708,244 @@ function toggleTheme() {
   localStorage.setItem('onr_theme', next);
 }
 (function(){ document.documentElement.dataset.theme = localStorage.getItem('onr_theme') || 'dark'; })();
+
+// ── FEATURE 1: PASTA DE AUTO-DOWNLOAD (PESQUISA ÚNICA) ────
+STATE.singleFolderHandle = null;
+
+async function selectSingleFolder() {
+  if (!('showDirectoryPicker' in window)) {
+    showMsg('msg-pesquisa','Navegador não suporta seleção de pasta. Use Chrome ou Edge.','warn'); return;
+  }
+  try {
+    STATE.singleFolderHandle = await window.showDirectoryPicker({mode:'readwrite'});
+    const disp = document.getElementById('single-folder-display');
+    disp.textContent = '📁 ' + STATE.singleFolderHandle.name;
+    disp.title = `Auto-download: ${STATE.singleFolderHandle.name}`;
+    document.getElementById('btn-clear-folder').style.display = '';
+  } catch {}
+}
+
+function clearSingleFolder() {
+  STATE.singleFolderHandle = null;
+  const disp = document.getElementById('single-folder-display');
+  disp.textContent = 'Sem pasta';
+  disp.title = 'Auto-download para esta pasta';
+  document.getElementById('btn-clear-folder').style.display = 'none';
+}
+
+// ── FEATURE 4: PDF MODE SWITCH ────────────────────────────
+STATE.pdfMode = 'oficial'; // 'oficial' | 'clone'
+document.documentElement.setAttribute('data-pdf-mode', 'oficial');
+
+function togglePdfMode() {
+  STATE.pdfMode = STATE.pdfMode === 'oficial' ? 'clone' : 'oficial';
+  document.documentElement.setAttribute('data-pdf-mode', STATE.pdfMode);
+  const lbl = document.getElementById('pdf-btn-label');
+  if (lbl) lbl.textContent = STATE.pdfMode === 'clone' ? 'Gerar PDF Clone' : 'Baixar Certidão PDF';
+  // No modo clone o indicador de background não é relevante
+  const ind = document.getElementById('pdf-indicator');
+  if (ind && STATE.pdfMode === 'clone') ind.classList.remove('show');
+}
+
+// ── FEATURE 3: EDITAR ITEM DO LOTE ───────────────────────
+function mlEditItem(id) {
+  const item = STATE.mlQueue.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('edit-item-id').value = id;
+  document.getElementById('edit-pedido').value  = item.pedido;
+  document.getElementById('edit-doc').value     = item.doc;
+  document.getElementById('edit-modal-overlay').classList.add('show');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal-overlay').classList.remove('show');
+}
+
+function saveEditItem() {
+  const id     = Number(document.getElementById('edit-item-id').value);
+  const pedido = document.getElementById('edit-pedido').value.trim();
+  const docVal = document.getElementById('edit-doc').value.trim();
+  if (!pedido || !docVal) return;
+  if (!validateDocInput(document.getElementById('edit-doc'),'edit')) return;
+  const item = STATE.mlQueue.find(i => i.id === id);
+  if (!item) return;
+  item.pedido = pedido;
+  item.doc    = docVal;
+  item.raw    = docVal.replace(/\D/g,'');
+  closeEditModal();
+  renderMLQueue();
+}
+
+// ── FEATURE 4: GERAR PDF CLONE ───────────────────────────
+async function generateClonePDF(data, rawDoc, pedido, feitoPor) {
+  const nome     = data.person?.currentPersonName || data.hashResult?.personName || 'DESCONHECIDO';
+  const docFmt   = data.person?.documentNumber || ((() => {
+    const d = rawDoc.replace(/\D/g,'');
+    if (d.length===11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4');
+    if (d.length===14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
+    return d;
+  })());
+  const hash     = data.hashResult?.hash || data.hash || '';
+  const orders   = data.orders || [];
+  const isNeg    = orders.length === 0;
+  const now      = new Date();
+  const pad      = n => String(n).padStart(2,'0');
+  const emitido  = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} às ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const nomeResp = feitoPor ? feitoPor.toUpperCase() : '—';
+  const h        = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const qrSrc    = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&ecc=M&data=${encodeURIComponent('https://indisponibilidade.onr.org.br//home/validar')}`;
+  const resultColor  = isNeg ? '#1a6b3c' : '#b91c1c';
+  const resultBg     = isNeg ? '#f0faf4' : '#fff0f0';
+  const resultBorder = isNeg ? '#1a6b3c' : '#b91c1c';
+  const resultLabel  = isNeg ? 'NEGATIVO' : 'POSITIVO';
+  const resultMsg    = isNeg
+    ? 'NÃO FORAM ENCONTRADA(S) INDISPONIBILIDADE(S) GENÉRICA(S) E\nESPECÍFICA(S) PARA O DOCUMENTO PESQUISADO'
+    : `FORAM ENCONTRADA(S) ${orders.length} INDISPONIBILIDADE(S) PARA O DOCUMENTO PESQUISADO`;
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>Relatório CNIB — ${h(nome)}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+@page{size:A4;margin:0;}
+body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#111;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.page{width:210mm;min-height:297mm;padding:14mm 14mm 12mm;display:flex;flex-direction:column;}
+.logos{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1.5px solid #999;margin-bottom:14px;}
+.logo-block{display:flex;align-items:center;gap:9px;}
+.logo-divider{width:1.5px;height:44px;background:#bbb;}
+.logo-icon-cnib{width:42px;height:42px;border-radius:50%;border:2px solid #1a6b3c;display:flex;align-items:center;justify-content:center;}
+.logo-text-cnib{font-size:8pt;color:#1a6b3c;font-weight:bold;line-height:1.35;}
+.logo-icon-onr{width:38px;height:38px;display:flex;align-items:center;justify-content:center;}
+.logo-text-onr{font-size:8pt;line-height:1.35;}
+.logo-text-onr strong{color:#1a2e6b;font-size:10pt;letter-spacing:.04em;}
+.logo-text-onr span{color:#555;font-size:7.5pt;}
+h1{font-size:14pt;font-weight:bold;text-align:center;margin:0 0 12px;color:#111;}
+.section-title{font-size:10pt;font-weight:bold;border-bottom:1.5px solid #666;padding-bottom:3px;margin:12px 0 8px;color:#111;}
+.data-row{display:flex;gap:48px;margin-bottom:6px;}
+.lbl{font-size:8.5pt;font-weight:bold;color:#333;margin-bottom:2px;}
+.val{font-size:10pt;color:#111;}
+.resultado{margin:10px 0;border-left:4px solid ${resultBorder};background:${resultBg};padding:10px 14px;}
+.resultado .rtitle{font-size:11pt;font-weight:bold;color:${resultColor};margin-bottom:4px;}
+.resultado .ricon{display:inline-block;width:16px;height:16px;border:2px solid ${resultColor};margin-right:6px;vertical-align:middle;flex-shrink:0;}
+.resultado .rmsg{font-size:8.5pt;font-weight:bold;color:#111;white-space:pre-line;}
+.bodytext{font-size:8pt;color:#333;line-height:1.6;margin-bottom:7px;text-align:justify;}
+.footer-outer{margin-top:auto;padding-top:10px;}
+.footer-box{border:1px solid #bbb;border-radius:4px 4px 0 0;padding:10px 14px;display:flex;align-items:center;gap:14px;}
+.footer-qr img{width:82px;height:82px;display:block;}
+.fi-lbl{font-size:8pt;font-weight:bold;color:#444;margin-bottom:3px;}
+.fi-hash{font-size:10.5pt;font-weight:bold;color:#111;letter-spacing:.03em;}
+.fi-link{font-size:7.5pt;color:#666;margin-top:3px;}
+.doc-footer{display:flex;border:1px solid #bbb;border-top:none;border-radius:0 0 4px 4px;overflow:hidden;}
+.dfc{flex:1;padding:7px 12px;border-right:1px solid #bbb;}
+.dfc:last-child{border-right:none;}
+.dfc-lbl{font-size:7.5pt;color:#555;margin-bottom:2px;}
+.dfc-val{font-size:8.5pt;font-weight:bold;color:#111;}
+.page-foot{margin-top:10px;padding-top:6px;border-top:1px solid #ddd;display:flex;justify-content:space-between;font-size:7pt;color:#888;}
+.no-print{display:block;}
+@media print{
+  .no-print{display:none!important;}
+  .page{padding:14mm 14mm 12mm;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="logos">
+    <div class="logo-block">
+      <div class="logo-icon-cnib">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="14" stroke="#1a6b3c" stroke-width="2"/>
+          <text x="16" y="20" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="7" fill="#1a6b3c">CNIB</text>
+        </svg>
+      </div>
+      <div class="logo-text-cnib">Central Nacional de<br/>Indisponibilidade de Bens</div>
+    </div>
+    <div class="logo-divider"></div>
+    <div class="logo-block">
+      <div class="logo-icon-onr">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="5" fill="#1a2e6b"/>
+          <circle cx="20" cy="20" r="10" stroke="#1a2e6b" stroke-width="2.5"/>
+          <circle cx="20" cy="20" r="17" stroke="#1a2e6b" stroke-width="1.2" stroke-dasharray="3.5 2.5"/>
+        </svg>
+      </div>
+      <div class="logo-text-onr">
+        <strong>.·.ONR</strong><br/>
+        <span>Operador Nacional do Sistema<br/>de Registro Eletrônico de Imóveis</span>
+      </div>
+    </div>
+  </div>
+
+  <h1>Relatório de Consulta de Indisponibilidade de Bens</h1>
+
+  <div class="section-title">Dados Pesquisados</div>
+  <div class="data-row">
+    <div><div class="lbl">CPF</div><div class="val">${h(docFmt)}</div></div>
+    <div><div class="lbl">NOME</div><div class="val">${h(nome.toUpperCase())}</div></div>
+  </div>
+
+  <div class="resultado">
+    <div class="rtitle">Resultado: ${resultLabel}</div>
+    <div style="display:flex;align-items:flex-start;gap:6px;margin-top:4px;">
+      <div class="ricon"></div>
+      <div class="rmsg">${h(resultMsg)}</div>
+    </div>
+  </div>
+
+  <div class="section-title">Informações Importantes</div>
+  <p class="bodytext">Este Relatório foi emitido pela Central Nacional de Indisponibilidade de Bens (CNIB), com base nos artigos 7º e 9º do Provimento CNJ nº 39/2014, de 25/7/2014, da Corregedoria Nacional de Justiça do Conselho Nacional de Justiça (CNJ).</p>
+  <p class="bodytext">A informação negativa não significa inexistência de indisponibilidades anteriormente decretadas, assim como eventuais indisponibilidades relacionadas referem-se apenas às ordens que foram cadastradas a partir das referidas datas. Em caso positivo são indicados os números dos processos de execuções trabalhistas, fiscais e cíveis, bem como os respectivos Tribunais em que tramitam, ressalvadas informações de processos que correm em segredo de justiça e em sigilo de justiça. Nessas hipóteses é mantida a informação do resultado positivo, devendo o interessado reportar-se diretamente aos Juízos ou instâncias administrativas competentes que decretaram a indisponibilidade de bens.</p>
+  <p class="bodytext">Os dados constantes deste relatório são de responsabilidade direta dos respectivos órgãos do Poder Judiciário e da Administração Pública que os cadastraram.</p>
+  <p class="bodytext">Para informações mais completas sobre a situação jurídica da pessoa pesquisada deverão ser feitas pesquisas de maior abrangência nos órgãos do Poder Judiciário e da Administração Pública.</p>
+
+  <div class="footer-outer">
+    <div class="footer-box">
+      <div class="footer-qr"><img src="${qrSrc}" alt="QR Code" crossorigin="anonymous"/></div>
+      <div>
+        <div class="fi-lbl">Validar autenticidade</div>
+        ${hash ? '<div class="fi-lbl" style="margin-top:7px;">Hash:</div><div class="fi-hash">' + h(hash) + '</div>' : ''}
+        <div class="fi-link">https://indisponibilidade.org.br</div>
+      </div>
+    </div>
+    <div class="doc-footer">
+      <div class="dfc"><div class="dfc-lbl">Emitido em:</div><div class="dfc-val">${h(emitido)}</div></div>
+      <div class="dfc"><div class="dfc-lbl">Responsável pela Consulta:</div><div class="dfc-val">${h(nomeResp)}</div></div>
+      <div class="dfc"><div class="dfc-lbl">CPF do Responsável:</div><div class="dfc-val">—</div></div>
+    </div>
+  </div>
+
+  <div class="page-foot">
+    <span>Data e Hora deste Relatório: ${h(emitido)}&nbsp;&nbsp;&nbsp;&nbsp;https://indisponibilidade.org.br</span>
+    <span>Relatório de Consulta de Indisponibilidade de Bens &nbsp;&nbsp; Página 1 de 1</span>
+  </div>
+</div>
+
+<div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:10px;z-index:999;">
+  <button onclick="window.print()" style="padding:10px 22px;background:#b8892f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.3);">
+    🖨 Salvar / Imprimir PDF
+  </button>
+  <button onclick="window.close()" style="padding:10px 16px;background:#444;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;">
+    Fechar
+  </button>
+</div>
+<script>
+const qrImg = document.querySelector('img[alt="QR Code"]');
+if (qrImg) { qrImg.onerror = () => { qrImg.style.display='none'; }; }
+<\/script>
+</body>
+</html>`;
+
+  const printWin = window.open('', '_blank', 'width=920,height=800,menubar=yes,toolbar=yes');
+  if (!printWin) {
+    showMsg('msg-pesquisa', 'Permita pop-ups para gerar o PDF Clone.', 'warn');
+    return null;
+  }
+  printWin.document.write(html);
+  printWin.document.close();
+  return true;
+}
 
 // ── AUTH ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -934,7 +1234,18 @@ function validCNPJ(c) {
   return calc(c.slice(0,12),[5,4,3,2,9,8,7,6,5,4,3,2])===+c[12]&&calc(c.slice(0,13),[6,5,4,3,2,9,8,7,6,5,4,3,2])===+c[13];
 }
 
-function docForFilename(raw) { return raw.replace(/\//g,''); }
+function docForFilename(raw) {
+  const d = raw.replace(/\D/g,'');
+  if (d.length === 11) {
+    // CPF: 000.000.000-00
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+  if (d.length === 14) {
+    // CNPJ sem barra: 00.000.000.0000-00
+    return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3.$4-$5');
+  }
+  return d;
+}
 
 // ── CONSULTA ───────────────────────────────────────────────
 async function consultar() {
@@ -1023,7 +1334,7 @@ function renderResult(data, rawDoc, attempt=0, pedido='', feitoPor='') {
         <button class="btn-pdf" id="btn-pdf" onclick="downloadPDF()">
           <svg class="pdf-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           <div class="pdf-spin"></div>
-          Baixar Certidão PDF
+          <span id="pdf-btn-label">${STATE.pdfMode === 'clone' ? 'Gerar PDF Clone' : 'Baixar Certidão PDF'}</span>
         </button>
         <!-- indicador de preparação do PDF em background -->
         <div class="pdf-indicator show" id="pdf-indicator">
@@ -1135,6 +1446,34 @@ async function downloadPDF() {
   const btn     = document.getElementById('btn-pdf');
   const cookies = localStorage.getItem('onr_cookies');
   if (!btn || !cookies) return;
+
+  const data      = STATE.currentResult;
+  const pedido    = STATE.currentPedido;
+  const feitoPor  = STATE.currentFeitoPor;
+  const orders    = data?.orders ?? [];
+  const nome      = data?.person?.currentPersonName || data?.hashResult?.personName || 'DESCONHECIDO';
+  const rawDoc    = (data?.person?.documentNumber || '').replace(/\D/g,'');
+  const resultado = orders.length > 0 ? 'CNIB POSITIVO' : 'CNIB NEGATIVO';
+  const nomeClean = nome.toUpperCase().replace(/[^A-Z0-9\s]/g,'').trim();
+  const parts     = [];
+  if (pedido)   parts.push(pedido);
+  parts.push(resultado, nomeClean);
+  if (rawDoc)   parts.push(docForFilename(rawDoc));
+  if (feitoPor) parts.push(`Feito por ${feitoPor}`);
+  const filename = parts.join(' - ') + '.pdf';
+
+  // ── MODO CLONE ──────────────────────────────────────────
+  if (STATE.pdfMode === 'clone') {
+    btn.classList.add('loading'); btn.disabled = true;
+    try {
+      await generateClonePDF(data, rawDoc, pedido, feitoPor);
+    } finally {
+      btn.classList.remove('loading'); btn.disabled = false;
+    }
+    return;
+  }
+
+  // ── MODO OFICIAL ────────────────────────────────────────
   btn.classList.add('loading'); btn.disabled = true;
 
   try {
@@ -1150,18 +1489,30 @@ async function downloadPDF() {
     }
 
     const blob = await res.blob();
-    const orders   = STATE.currentResult?.orders ?? [];
-    const nome     = STATE.currentResult?.person?.currentPersonName || STATE.currentResult?.hashResult?.personName || 'DESCONHECIDO';
-    const rawDoc   = (STATE.currentResult?.person?.documentNumber || '').replace(/\D/g,'');
-    const resultado = orders.length > 0 ? 'CNIB POSITIVO' : 'CNIB NEGATIVO';
-    const nomeClean = nome.toUpperCase().replace(/[^A-Z0-9\s]/g,'').trim();
-    const parts = [];
-    if (STATE.currentPedido)  parts.push(STATE.currentPedido);
-    parts.push(resultado, nomeClean);
-    if (rawDoc) parts.push(docForFilename(rawDoc));
-    if (STATE.currentFeitoPor) parts.push(`Feito por ${STATE.currentFeitoPor}`);
-    const filename = parts.join(' - ') + '.pdf';
 
+    // ── Feature 1: salva direto na pasta se definida ─────
+    if (STATE.singleFolderHandle) {
+      try {
+        const fileHandle = await STATE.singleFolderHandle.getFileHandle(filename, {create:true});
+        const writable   = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        // Também copia o nome para clipboard
+        try { await navigator.clipboard.writeText(filename); } catch {}
+        const indicator = document.getElementById('pdf-indicator');
+        if (indicator) {
+          indicator.classList.add('done');
+          indicator.querySelector('.pi-spin').style.display='none';
+          const t = indicator.querySelector('#pdf-indicator-text');
+          if (t) t.textContent = `Salvo em "${STATE.singleFolderHandle.name}"`;
+        }
+        return;
+      } catch {
+        // Falhou ao salvar na pasta — cai no download normal
+      }
+    }
+
+    // Download normal pelo navegador
     const url = URL.createObjectURL(blob);
     const a   = document.createElement('a');
     a.href = url; a.download = filename;
@@ -1171,7 +1522,6 @@ async function downloadPDF() {
 
     try { await navigator.clipboard.writeText(filename); } catch {}
 
-    // Atualiza indicador
     const indicator = document.getElementById('pdf-indicator');
     if (indicator) {
       indicator.classList.add('done');
@@ -1179,7 +1529,7 @@ async function downloadPDF() {
       const t = indicator.querySelector('#pdf-indicator-text');
       if (t) t.textContent = 'PDF baixado com sucesso';
     }
-  } catch (err) {
+  } catch {
     showMsg('msg-pesquisa','Erro ao baixar PDF. Tente novamente.','error');
   } finally {
     btn.classList.remove('loading'); btn.disabled = false;
@@ -1276,7 +1626,13 @@ function renderMLQueue() {
       <div class="q-doc">${esc(item.doc)}</div>
       <div class="q-name">${esc(item.nome || item.doc)}</div>
       <div class="queue-status ${sc}">${sl}</div>
-      ${item.status==='pending'?`<div class="q-remove" onclick="mlRemoveItem(${item.id})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>`:''}
+      ${item.status==='pending'?`
+        <div class="q-remove" onclick="mlEditItem(${item.id})" title="Editar" style="margin-left:0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <div class="q-remove" onclick="mlRemoveItem(${item.id})" title="Remover">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>`:''}
     </div>`;
   }).join('');
 }
