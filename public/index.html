@@ -368,6 +368,86 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
   color:var(--amber);margin-top:12px;
 }
 .hidden{display:none!important;}
+
+/* CERT LOGIN BUTTON */
+.cert-login-btn{
+  width:100%;margin-top:12px;
+  display:flex;align-items:center;gap:12px;
+  padding:13px 16px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--card-bg);
+  cursor:pointer;font-family:'DM Sans',sans-serif;
+  font-size:13px;font-weight:400;color:var(--text-2);
+  transition:all .25s var(--trans);text-align:left;
+}
+.cert-login-btn:hover{border-color:rgba(91,156,246,.4);color:var(--text);background:var(--blue-dim);}
+.cert-login-btn:disabled{opacity:.5;cursor:not-allowed;}
+.cert-login-btn .cert-icon{
+  width:32px;height:32px;border-radius:8px;flex-shrink:0;
+  background:var(--blue-dim);border:1px solid rgba(91,156,246,.25);
+  display:grid;place-items:center;color:var(--blue);
+}
+.cert-login-btn .cert-icon svg{width:15px;height:15px;}
+.cert-login-btn .cert-text{flex:1;}
+.cert-login-btn .cert-title{font-size:13px;font-weight:500;color:var(--text);line-height:1.3;}
+.cert-login-btn .cert-sub{font-size:11px;color:var(--text-3);margin-top:1px;}
+.cert-login-btn .cert-spin{
+  width:15px;height:15px;flex-shrink:0;
+  border:2px solid rgba(91,156,246,.25);border-top-color:var(--blue);
+  border-radius:50%;animation:spin .7s linear infinite;display:none;
+}
+.cert-login-btn.loading .cert-spin{display:block;}
+.cert-login-btn.loading .cert-arrow{display:none;}
+.cert-arrow{color:var(--text-3);flex-shrink:0;}
+.cert-arrow svg{width:15px;height:15px;}
+
+/* CERT WAITING MODAL */
+.cert-modal-overlay{
+  position:fixed;inset:0;z-index:3000;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;
+  animation:fadeIn .2s both;
+}
+.cert-modal-overlay.show{display:flex;}
+.cert-modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:32px 28px;
+  max-width:360px;width:90%;text-align:center;
+  box-shadow:var(--shadow);animation:slideUp .3s var(--trans) both;
+}
+.cert-modal-icon{
+  width:56px;height:56px;border-radius:50%;margin:0 auto 18px;
+  background:var(--blue-dim);border:1px solid rgba(91,156,246,.3);
+  display:grid;place-items:center;
+}
+.cert-modal-icon svg{color:var(--blue);width:24px;}
+.cert-modal-ring{
+  width:56px;height:56px;border-radius:50%;margin:0 auto 18px;
+  border:2px solid var(--border);border-top-color:var(--blue);
+  animation:spin .9s linear infinite;display:none;
+}
+.cert-modal.waiting .cert-modal-icon{display:none;}
+.cert-modal.waiting .cert-modal-ring{display:block;}
+.cert-modal-title{
+  font-family:'DM Serif Display',serif;font-size:19px;
+  color:var(--text);margin-bottom:8px;
+}
+.cert-modal-desc{font-size:13px;color:var(--text-3);line-height:1.7;margin-bottom:20px;}
+.cert-modal-steps{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:14px;text-align:left;
+  margin-bottom:20px;display:flex;flex-direction:column;gap:8px;
+}
+.cert-step{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--text-2);}
+.cert-step-num{
+  width:18px;height:18px;border-radius:50%;flex-shrink:0;
+  background:var(--amber-glow);border:1px solid rgba(212,168,75,.3);
+  color:var(--amber);font-size:10px;font-weight:600;
+  display:grid;place-items:center;margin-top:1px;
+}
+.cert-modal-status{
+  font-family:'DM Mono',monospace;font-size:11px;
+  color:var(--text-3);margin-bottom:16px;min-height:18px;
+}
 </style>
 </head>
 <body>
@@ -460,7 +540,68 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
         </div>
       </div>
 
+      <!-- DIVISOR -->
+      <div class="auth-divider"><span>ou</span></div>
+
+      <!-- CERTIFICADO DIGITAL -->
+      <button class="cert-login-btn" id="btn-cert-login" onclick="loginComCertificado()">
+        <div class="cert-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            <circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <div class="cert-text">
+          <div class="cert-title">Entrar com Certificado Digital</div>
+          <div class="cert-sub">Token físico A3 · Web PKI · CERTSIGN RFB</div>
+        </div>
+        <div class="cert-spin"></div>
+        <div class="cert-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </button>
+
     </div>
+  </div>
+</div><!-- /auth-panel -->
+
+<!-- MODAL DE ESPERA — LOGIN COM CERTIFICADO -->
+<div class="cert-modal-overlay" id="cert-modal-overlay">
+  <div class="cert-modal" id="cert-modal">
+    <div class="cert-modal-ring"></div>
+    <div class="cert-modal-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div class="cert-modal-title" id="cert-modal-title">Autenticação com Certificado</div>
+    <div class="cert-modal-desc" id="cert-modal-desc">
+      Uma janela do navegador foi aberta. Siga os passos para autenticar com seu token.
+    </div>
+    <div class="cert-modal-steps" id="cert-modal-steps">
+      <div class="cert-step">
+        <div class="cert-step-num">1</div>
+        <span>Na janela aberta, selecione o certificado <strong>CERTSIGN RFB</strong> detectado pelo Web PKI</span>
+      </div>
+      <div class="cert-step">
+        <div class="cert-step-num">2</div>
+        <span>Clique em <strong>Acessar</strong> e aguarde o popup de senha do token</span>
+      </div>
+      <div class="cert-step">
+        <div class="cert-step-num">3</div>
+        <span>Digite a <strong>senha do token</strong> no popup do Web PKI e confirme</span>
+      </div>
+      <div class="cert-step">
+        <div class="cert-step-num">4</div>
+        <span>Aguarde — a sessão será capturada automaticamente</span>
+      </div>
+    </div>
+    <div class="cert-modal-status" id="cert-modal-status">Aguardando autenticação...</div>
+    <button class="btn btn-outline btn-full" onclick="cancelarLoginCertificado()" id="btn-cert-cancel">
+      Cancelar
+    </button>
   </div>
 </div>
 
@@ -1779,6 +1920,188 @@ function refazerPesquisa(doc) {
 function closeModal(e) {
   if (e && e.target !== document.getElementById('modal-overlay')) return;
   document.getElementById('modal-overlay').classList.remove('show');
+}
+
+// ── LOGIN COM CERTIFICADO DIGITAL ──────────────────────────
+let _certPollInterval = null;
+
+async function loginComCertificado() {
+  const btn = document.getElementById('btn-cert-login');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  hideMsg('msg-auth');
+
+  try {
+    const r = await fetch('/api/cert-login/start', { method: 'POST' });
+    const d = await r.json();
+
+    if (!r.ok || !d.ok) {
+      if (d.needsSetup) {
+        // Chrome não estava em modo debug — mostra modal com instrução
+        _certModalSetup(d.chromePath);
+      } else {
+        showMsg('msg-auth', d.error || 'Erro ao iniciar login com certificado.', 'error');
+        _resetCertBtn();
+      }
+      return;
+    }
+
+    // Chrome conectado — mostra modal de espera e inicia polling
+    _abrirCertModal();
+    _certPollInterval = setInterval(_verificarStatusCert, 2000);
+
+  } catch (err) {
+    showMsg('msg-auth', 'Erro ao conectar com o servidor.', 'error');
+    _resetCertBtn();
+  }
+}
+
+function _certModalSetup(chromePath) {
+  // Modo especial: instrui o usuário a reabrir o Chrome com a flag de debug
+  const modal   = document.getElementById('cert-modal');
+  const overlay = document.getElementById('cert-modal-overlay');
+
+  modal.classList.remove('waiting');
+  document.getElementById('cert-modal-title').textContent = 'Configuração necessária';
+  document.getElementById('cert-modal-desc').innerHTML =
+    'Para autenticar com o certificado, o Chrome precisa ser iniciado com a opção de depuração remota.<br><br>' +
+    '<strong style="color:var(--amber)">Feche o Chrome completamente</strong> e clique em <strong>Abrir Chrome Configurado</strong> abaixo.';
+  document.getElementById('cert-modal-steps').style.display = 'none';
+  document.getElementById('cert-modal-status').textContent  = '';
+  document.getElementById('btn-cert-cancel').textContent    = 'Cancelar';
+
+  // Troca o botão cancelar por dois botões: Abrir Chrome + Cancelar
+  const actionsEl = document.getElementById('cert-modal-actions');
+  if (actionsEl) actionsEl.remove();
+  const actions = document.createElement('div');
+  actions.id = 'cert-modal-actions';
+  actions.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+  actions.innerHTML = `
+    <button class="btn btn-primary btn-full" onclick="_tentarAbrirChrome()">
+      Abrir Chrome Configurado
+    </button>
+  `;
+  document.getElementById('btn-cert-cancel').before(actions);
+
+  overlay.classList.add('show');
+  _resetCertBtn();
+}
+
+async function _tentarAbrirChrome() {
+  document.getElementById('cert-modal-desc').innerHTML =
+    'Abrindo Chrome com depuração remota...<br>Aguarde alguns segundos e clique em <strong>Tentar novamente</strong>.';
+
+  const actionsEl = document.getElementById('cert-modal-actions');
+  if (actionsEl) actionsEl.innerHTML = `
+    <button class="btn btn-primary btn-full" onclick="_retentar()">
+      Tentar novamente
+    </button>
+  `;
+
+  await fetch('/api/cert-login/open-chrome', { method: 'POST' }).catch(() => {});
+}
+
+async function _retentar() {
+  const actionsEl = document.getElementById('cert-modal-actions');
+  if (actionsEl) actionsEl.remove();
+  document.getElementById('cert-modal-overlay').classList.remove('show');
+  await loginComCertificado();
+}
+
+function _abrirCertModal() {
+  const overlay = document.getElementById('cert-modal-overlay');
+  const modal   = document.getElementById('cert-modal');
+  modal.classList.add('waiting');
+  document.getElementById('cert-modal-title').textContent = 'Aguardando autenticação...';
+  document.getElementById('cert-modal-desc').textContent  = 'Conclua o login na janela que foi aberta. Esta tela fechará automaticamente.';
+  document.getElementById('cert-modal-status').textContent = 'Aguardando autenticação...';
+  document.getElementById('cert-modal-steps').style.display = 'flex';
+  document.getElementById('btn-cert-cancel').style.display  = '';
+  overlay.classList.add('show');
+}
+
+async function _verificarStatusCert() {
+  try {
+    const r = await fetch('/api/cert-login/status');
+    const d = await r.json();
+    const statusEl = document.getElementById('cert-modal-status');
+
+    if (d.status === 'done' && d.cookies) {
+      // Login concluído! Valida os cookies e autentica
+      clearInterval(_certPollInterval);
+      _certPollInterval = null;
+
+      statusEl.textContent = 'Login detectado! Validando sessão...';
+      document.getElementById('cert-modal-steps').style.display = 'none';
+      document.getElementById('btn-cert-cancel').style.display  = 'none';
+
+      // Valida no servidor
+      const vr = await fetch('/api/validar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookies: d.cookies })
+      });
+      const vd = await vr.json();
+
+      if (vr.ok && vd.sucesso) {
+        // Sucesso — autentica!
+        localStorage.setItem('onr_cookies', d.cookies);
+        document.getElementById('cert-modal-overlay').classList.remove('show');
+        document.getElementById('cert-modal').classList.remove('waiting');
+        _resetCertBtn();
+        setAuthenticated(true);
+      } else {
+        _certModalErro('Sessão capturada, mas o ONR recusou os cookies. Tente novamente.');
+      }
+
+    } else if (d.status === 'timeout') {
+      clearInterval(_certPollInterval);
+      _certPollInterval = null;
+      _certModalErro('Tempo esgotado (3 minutos). Tente novamente.');
+
+    } else if (d.status === 'error') {
+      clearInterval(_certPollInterval);
+      _certPollInterval = null;
+      _certModalErro('Ocorreu um erro durante o login. Tente novamente.');
+
+    } else if (d.status === 'waiting') {
+      // Atualiza status visual com ponto animado
+      const dots = ['Aguardando autenticação', 'Aguardando autenticação.', 'Aguardando autenticação..', 'Aguardando autenticação...'];
+      statusEl.textContent = dots[Math.floor(Date.now() / 600) % 4];
+    }
+
+  } catch {
+    // Ignora erros de rede passageiros no polling
+  }
+}
+
+function _certModalErro(msg) {
+  const modal   = document.getElementById('cert-modal');
+  const overlay = document.getElementById('cert-modal-overlay');
+  modal.classList.remove('waiting');
+  document.getElementById('cert-modal-title').textContent = 'Falha na autenticação';
+  document.getElementById('cert-modal-desc').textContent  = msg;
+  document.getElementById('cert-modal-status').textContent = '';
+  document.getElementById('cert-modal-steps').style.display = 'none';
+  document.getElementById('btn-cert-cancel').textContent    = 'Fechar';
+}
+
+async function cancelarLoginCertificado() {
+  clearInterval(_certPollInterval);
+  _certPollInterval = null;
+
+  // Cancela no servidor (fecha o browser que estava aberto)
+  fetch('/api/cert-login/cancel', { method: 'POST' }).catch(() => {});
+
+  document.getElementById('cert-modal-overlay').classList.remove('show');
+  document.getElementById('cert-modal').classList.remove('waiting');
+  document.getElementById('btn-cert-cancel').textContent = 'Cancelar';
+  _resetCertBtn();
+}
+
+function _resetCertBtn() {
+  const btn = document.getElementById('btn-cert-login');
+  if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
 }
 
 // ── UTILS ──────────────────────────────────────────────────
