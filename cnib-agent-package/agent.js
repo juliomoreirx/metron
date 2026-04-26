@@ -258,10 +258,11 @@ function pushCookies(cookies) {
         process.exit(1);
     }
 
-    // 3. Abre nova aba navegando para o login do ONR via API DevTools
+    // 3. Abre nova aba em branco e navega para o ONR via CDP
     const newTab = await new Promise((resolve) => {
+        // /json/new sem parâmetro abre aba em branco e retorna o ID+wsUrl
         http.get(
-            `http://localhost:${DEBUG_PORT}/json/new?https://indisponibilidade.onr.org.br/login/certificate`,
+            `http://localhost:${DEBUG_PORT}/json/new`,
             { timeout: 5000 },
             (res) => {
                 let data = '';
@@ -275,6 +276,53 @@ function pushCookies(cookies) {
         showMsg('Não foi possível abrir aba no Chrome. Tente novamente.');
         process.exit(1);
     }
+
+    // Navega para o ONR via CDP Page.navigate na aba recém-aberta
+    await new Promise((resolve) => {
+        const wsUrl  = new URL(newTab.webSocketDebuggerUrl);
+        const key    = Buffer.from('cnib-nav-' + Math.random()).toString('base64').slice(0, 24);
+        const navMsg = JSON.stringify({
+            id: 1,
+            method: 'Page.navigate',
+            params: { url: 'https://indisponibilidade.onr.org.br/login/certificate' }
+        });
+        const buf   = Buffer.from(navMsg);
+        const frame = Buffer.alloc(2 + buf.length);
+        frame[0] = 0x81; frame[1] = buf.length;
+        buf.copy(frame, 2);
+
+        const sock = net.createConnection({ host: '127.0.0.1', port: DEBUG_PORT }, () => {
+            sock.write([
+                `GET ${wsUrl.pathname} HTTP/1.1`,
+                `Host: localhost:${DEBUG_PORT}`,
+                'Upgrade: websocket',
+                'Connection: Upgrade',
+                `Sec-WebSocket-Key: ${key}`,
+                'Sec-WebSocket-Version: 13',
+                '', '',
+            ].join('\r\n'));
+        });
+
+        let upgraded = false;
+        sock.setTimeout(6000);
+        sock.on('data', (chunk) => {
+            if (!upgraded) {
+                if (chunk.toString().includes('101')) {
+                    upgraded = true;
+                    sock.write(frame); // envia Page.navigate
+                }
+                return;
+            }
+            // Recebeu resposta do navigate — fecha e resolve
+            sock.destroy();
+            resolve();
+        });
+        sock.on('error', () => resolve());
+        sock.on('timeout', () => { sock.destroy(); resolve(); });
+    });
+
+    // Aguarda a página carregar um pouco antes de começar o polling
+    await new Promise(r => setTimeout(r, 2000));
 
     // 4. Monitora cookies via CDP polling (mais simples e compatível com pkg)
     const deadline = Date.now() + TIMEOUT_MS;
