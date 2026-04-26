@@ -5,6 +5,7 @@ const cors      = require('cors');
 const axios     = require('axios');
 const FormData  = require('form-data');
 const path      = require('path');
+const fs        = require('fs');
 const puppeteer = require('puppeteer');
 
 const app  = express();
@@ -474,6 +475,21 @@ setInterval(() => {
     }
     if (n) console.log(`[GC] ${n} sessões removidas`);
 }, 10 * 60 * 1000);
+
+// ═══════════════════════════════════════════════════════════
+// DOWNLOAD DO AGENTE — serve o pacote cnib-agent-setup.zip
+// ═══════════════════════════════════════════════════════════
+app.get('/cnib-agent-setup.zip', (req, res) => {
+    const zipPath = path.join(__dirname, 'cnib-agent-setup.zip');
+    if (fs.existsSync(zipPath)) {
+        res.download(zipPath, 'cnib-agent-setup.zip');
+    } else {
+        res.status(404).json({
+            error: 'Pacote do agente não encontrado no servidor.',
+            info: 'Execute: npm run build-agent na VPS para gerar o pacote.'
+        });
+    }
+});
 
 // ═══════════════════════════════════════════════════════════
 // LOGIN COM CERTIFICADO DIGITAL — arquitetura agente local

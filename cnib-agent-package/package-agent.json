@@ -1,0 +1,15 @@
+{
+  "name": "cnib-agent",
+  "version": "1.0.0",
+  "description": "Agente local CNIB para login com certificado digital",
+  "main": "agent.js",
+  "bin": "agent.js",
+  "pkg": {
+    "targets": ["node18-win-x64"],
+    "outputPath": ".",
+    "assets": []
+  },
+  "scripts": {
+    "build": "npx pkg agent.js --target node18-win-x64 --output cnib-agent.exe"
+  }
+}
