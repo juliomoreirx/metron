@@ -249,80 +249,59 @@ function pushCookies(cookies) {
         }
     }
 
-    // 2. Conecta via DevTools para obter a lista de páginas
-    await new Promise(r => setTimeout(r, 500)); // pequena pausa para o Chrome estabilizar
-    const devtools = await fetchDevTools();
+    // 2. Abre aba do ONR diretamente via PowerShell + Chrome DevTools HTTP API
+    // Estratégia: usa o endpoint /json/new com URL encodada no path
+    // e como fallback abre via linha de comando do Chrome
 
-    if (!devtools || !devtools.webSocketDebuggerUrl) {
-        showMsg('Não foi possível conectar ao Chrome. Tente novamente.');
-        process.exit(1);
-    }
+    const ONR_URL = 'https://indisponibilidade.onr.org.br/login/certificate';
 
-    // 3. Abre nova aba em branco e navega para o ONR via CDP
-    const newTab = await new Promise((resolve) => {
-        // /json/new sem parâmetro abre aba em branco e retorna o ID+wsUrl
-        http.get(
-            `http://localhost:${DEBUG_PORT}/json/new`,
+    // Tenta abrir a aba via DevTools API (GET /json/new?url)
+    let newTab = await new Promise((resolve) => {
+        const encodedUrl = encodeURIComponent(ONR_URL);
+        const req = http.get(
+            `http://localhost:${DEBUG_PORT}/json/new?${encodedUrl}`,
             { timeout: 5000 },
             (res) => {
                 let data = '';
                 res.on('data', c => data += c);
-                res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
+                res.on('end', () => {
+                    try { resolve(JSON.parse(data)); }
+                    catch { resolve(null); }
+                });
             }
-        ).on('error', () => resolve(null));
+        );
+        req.on('error', () => resolve(null));
     });
 
-    if (!newTab || !newTab.webSocketDebuggerUrl) {
-        showMsg('Não foi possível abrir aba no Chrome. Tente novamente.');
-        process.exit(1);
+    // Verifica se a aba abriu na URL certa (alguns Chrome ignoram o parâmetro)
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Lista as abas abertas para confirmar
+    const pages = await new Promise((resolve) => {
+        http.get(`http://localhost:${DEBUG_PORT}/json/list`, { timeout: 3000 }, (res) => {
+            let d = '';
+            res.on('data', c => d += c);
+            res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve([]); } });
+        }).on('error', () => resolve([]));
+    });
+
+    // Verifica se alguma aba já está no ONR
+    let onrTabId = null;
+    const onrTab = pages.find(p => p.url && p.url.includes('indisponibilidade.onr.org.br') && p.type === 'page');
+    if (onrTab) {
+        onrTabId = onrTab.id;
+    } else {
+        // O Chrome abriu aba em branco — navega via PowerShell chamando o Chrome diretamente
+        // Isso funciona porque o Chrome em modo debug aceita abrir URLs pelo próprio executável
+        const chromePath = detectChromePath();
+        if (chromePath) {
+            await new Promise((resolve) => {
+                const cmd = `powershell -WindowStyle Hidden -Command "Start-Process '${chromePath}' -ArgumentList '${ONR_URL}','--remote-debugging-port=${DEBUG_PORT}'"`;
+                exec(cmd, () => resolve());
+            });
+            await new Promise(r => setTimeout(r, 2000));
+        }
     }
-
-    // Navega para o ONR via CDP Page.navigate na aba recém-aberta
-    await new Promise((resolve) => {
-        const wsUrl  = new URL(newTab.webSocketDebuggerUrl);
-        const key    = Buffer.from('cnib-nav-' + Math.random()).toString('base64').slice(0, 24);
-        const navMsg = JSON.stringify({
-            id: 1,
-            method: 'Page.navigate',
-            params: { url: 'https://indisponibilidade.onr.org.br/login/certificate' }
-        });
-        const buf   = Buffer.from(navMsg);
-        const frame = Buffer.alloc(2 + buf.length);
-        frame[0] = 0x81; frame[1] = buf.length;
-        buf.copy(frame, 2);
-
-        const sock = net.createConnection({ host: '127.0.0.1', port: DEBUG_PORT }, () => {
-            sock.write([
-                `GET ${wsUrl.pathname} HTTP/1.1`,
-                `Host: localhost:${DEBUG_PORT}`,
-                'Upgrade: websocket',
-                'Connection: Upgrade',
-                `Sec-WebSocket-Key: ${key}`,
-                'Sec-WebSocket-Version: 13',
-                '', '',
-            ].join('\r\n'));
-        });
-
-        let upgraded = false;
-        sock.setTimeout(6000);
-        sock.on('data', (chunk) => {
-            if (!upgraded) {
-                if (chunk.toString().includes('101')) {
-                    upgraded = true;
-                    sock.write(frame); // envia Page.navigate
-                }
-                return;
-            }
-            // Recebeu resposta do navigate — fecha e resolve
-            sock.destroy();
-            resolve();
-        });
-        sock.on('error', () => resolve());
-        sock.on('timeout', () => { sock.destroy(); resolve(); });
-    });
-
-    // Aguarda a página carregar um pouco antes de começar o polling
-    await new Promise(r => setTimeout(r, 2000));
 
     // 4. Monitora cookies via CDP polling (mais simples e compatível com pkg)
     const deadline = Date.now() + TIMEOUT_MS;
@@ -349,17 +328,19 @@ function pushCookies(cookies) {
 
         // Verifica cookies via Network.getCookies pelo WebSocket
         const cookies = await new Promise((resolve) => {
-            const ws = newTab.webSocketDebuggerUrl || onrTab.webSocketDebuggerUrl;
+            const wsDebugUrl = onrTab.webSocketDebuggerUrl;
+            if (!wsDebugUrl) return resolve(null);
+
             const reqMsg = JSON.stringify({ id: 1, method: 'Network.getCookies', params: { urls: ['https://indisponibilidade.onr.org.br'] } });
             const buf    = Buffer.from(reqMsg);
             const frame  = Buffer.alloc(2 + buf.length);
             frame[0] = 0x81; frame[1] = buf.length;
             buf.copy(frame, 2);
 
+            const wsPath = new URL(wsDebugUrl).pathname;
+            const key    = Buffer.from('cnib' + Math.random()).toString('base64');
+
             const sock = net.createConnection({ host: '127.0.0.1', port: DEBUG_PORT }, () => {
-                // Handshake
-                const wsPath = new URL(onrTab.webSocketDebuggerUrl).pathname;
-                const key    = Buffer.from('cnib' + Math.random()).toString('base64');
                 sock.write([
                     `GET ${wsPath} HTTP/1.1`, `Host: localhost:${DEBUG_PORT}`,
                     'Upgrade: websocket', 'Connection: Upgrade',
