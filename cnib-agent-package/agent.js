@@ -249,59 +249,24 @@ function pushCookies(cookies) {
         }
     }
 
-    // 2. Abre aba do ONR diretamente via PowerShell + Chrome DevTools HTTP API
-    // Estratégia: usa o endpoint /json/new com URL encodada no path
-    // e como fallback abre via linha de comando do Chrome
+    // 2. Abre aba do ONR diretamente via Chrome CLI
+    // Passa a URL como argumento para o Chrome já aberto em modo debug,
+    // que abre automaticamente uma nova aba na URL correta
+    const ONR_URL    = 'https://indisponibilidade.onr.org.br/login/certificate';
+    const chromePath = detectChromePath();
 
-    const ONR_URL = 'https://indisponibilidade.onr.org.br/login/certificate';
-
-    // Tenta abrir a aba via DevTools API (GET /json/new?url)
-    let newTab = await new Promise((resolve) => {
-        const encodedUrl = encodeURIComponent(ONR_URL);
-        const req = http.get(
-            `http://localhost:${DEBUG_PORT}/json/new?${encodedUrl}`,
-            { timeout: 5000 },
-            (res) => {
-                let data = '';
-                res.on('data', c => data += c);
-                res.on('end', () => {
-                    try { resolve(JSON.parse(data)); }
-                    catch { resolve(null); }
-                });
-            }
-        );
-        req.on('error', () => resolve(null));
-    });
-
-    // Verifica se a aba abriu na URL certa (alguns Chrome ignoram o parâmetro)
-    await new Promise(r => setTimeout(r, 1500));
-
-    // Lista as abas abertas para confirmar
-    const pages = await new Promise((resolve) => {
-        http.get(`http://localhost:${DEBUG_PORT}/json/list`, { timeout: 3000 }, (res) => {
-            let d = '';
-            res.on('data', c => d += c);
-            res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve([]); } });
-        }).on('error', () => resolve([]));
-    });
-
-    // Verifica se alguma aba já está no ONR
-    let onrTabId = null;
-    const onrTab = pages.find(p => p.url && p.url.includes('indisponibilidade.onr.org.br') && p.type === 'page');
-    if (onrTab) {
-        onrTabId = onrTab.id;
-    } else {
-        // O Chrome abriu aba em branco — navega via PowerShell chamando o Chrome diretamente
-        // Isso funciona porque o Chrome em modo debug aceita abrir URLs pelo próprio executável
-        const chromePath = detectChromePath();
-        if (chromePath) {
-            await new Promise((resolve) => {
-                const cmd = `powershell -WindowStyle Hidden -Command "Start-Process '${chromePath}' -ArgumentList '${ONR_URL}','--remote-debugging-port=${DEBUG_PORT}'"`;
-                exec(cmd, () => resolve());
-            });
-            await new Promise(r => setTimeout(r, 2000));
-        }
+    if (!chromePath) {
+        showMsg('Google Chrome não encontrado. Instale o Chrome e tente novamente.');
+        process.exit(1);
     }
+
+    await new Promise((resolve) => {
+        const cmd = `powershell -WindowStyle Hidden -Command "Start-Process '${chromePath}' -ArgumentList '${ONR_URL}','--remote-debugging-port=${DEBUG_PORT}'"`;
+        exec(cmd, () => resolve());
+    });
+
+    // Aguarda a aba carregar
+    await new Promise(r => setTimeout(r, 2500));
 
     // 4. Monitora cookies via CDP polling (mais simples e compatível com pkg)
     const deadline = Date.now() + TIMEOUT_MS;
