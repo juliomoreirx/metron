@@ -268,9 +268,10 @@ function pushCookies(cookies) {
     // Aguarda a aba carregar
     await new Promise(r => setTimeout(r, 2500));
 
-    // 4. Monitora cookies via CDP polling (mais simples e compatível com pkg)
-    const deadline = Date.now() + TIMEOUT_MS;
-    let cookieStr  = null;
+    // 4. Monitora cookies via polling
+    const deadline      = Date.now() + TIMEOUT_MS;
+    let cookieStr       = null;
+    let onrTabIdToClose = null;
 
     while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 2000));
@@ -350,6 +351,8 @@ function pushCookies(cookies) {
             const cnibAuth = cookies.find(c => c.name === 'CNIB.Auth' || c.name === 'CNIB.AuthC1');
             if (cnibUser || cnibAuth) {
                 cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+                // Guarda o ID da aba para fechar depois
+                onrTabIdToClose = onrTab.id;
                 break;
             }
         }
@@ -360,8 +363,33 @@ function pushCookies(cookies) {
         process.exit(1);
     }
 
-    // 5. Fecha a aba do ONR
-    http.get(`http://localhost:${DEBUG_PORT}/json/close/${newTab.id}`, () => {}).on('error', () => {});
+    // 5. Fecha todas as abas do ONR abertas pelo agente
+    await new Promise((resolve) => {
+        // Lista todas as abas abertas
+        http.get(`http://localhost:${DEBUG_PORT}/json/list`, { timeout: 3000 }, (res) => {
+            let d = '';
+            res.on('data', c => d += c);
+            res.on('end', () => {
+                try {
+                    const allPages = JSON.parse(d);
+                    // Fecha todas as abas que sejam do ONR ou about:blank abertas pelo agente
+                    const toClose = allPages.filter(p =>
+                        p.type === 'page' && (
+                            (p.url && p.url.includes('indisponibilidade.onr.org.br')) ||
+                            p.url === 'about:blank'
+                        )
+                    );
+                    let closed = 0;
+                    if (toClose.length === 0) return resolve();
+                    toClose.forEach(p => {
+                        http.get(`http://localhost:${DEBUG_PORT}/json/close/${p.id}`, () => {
+                            if (++closed >= toClose.length) resolve();
+                        }).on('error', () => { if (++closed >= toClose.length) resolve(); });
+                    });
+                } catch { resolve(); }
+            });
+        }).on('error', () => resolve());
+    });
 
     // 6. Envia cookies para a VPS
     try {
