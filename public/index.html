@@ -1924,6 +1924,7 @@ function closeModal(e) {
 
 // ── LOGIN COM CERTIFICADO DIGITAL ──────────────────────────
 let _certPollInterval = null;
+let _certSessionId    = null;
 
 async function loginComCertificado() {
   const btn = document.getElementById('btn-cert-login');
@@ -1932,23 +1933,23 @@ async function loginComCertificado() {
   hideMsg('msg-auth');
 
   try {
+    // 1. Pede à VPS para criar uma sessão de login
     const r = await fetch('/api/cert-login/start', { method: 'POST' });
     const d = await r.json();
 
     if (!r.ok || !d.ok) {
-      if (d.needsSetup) {
-        // Chrome não estava em modo debug — mostra modal com instrução
-        _certModalSetup(d.chromePath);
-      } else {
-        showMsg('msg-auth', d.error || 'Erro ao iniciar login com certificado.', 'error');
-        _resetCertBtn();
-      }
+      showMsg('msg-auth', d.error || 'Erro ao iniciar sessão.', 'error');
+      _resetCertBtn();
       return;
     }
 
-    // Chrome conectado — mostra modal de espera e inicia polling
+    _certSessionId = d.sessionId;
+
+    // 2. Mostra modal com instrução para rodar o agente
     _abrirCertModal();
-    _certPollInterval = setInterval(_verificarStatusCert, 2000);
+
+    // 3. Inicia polling aguardando o agente enviar os cookies
+    _certPollInterval = setInterval(_verificarStatusCert, 2500);
 
   } catch (err) {
     showMsg('msg-auth', 'Erro ao conectar com o servidor.', 'error');
@@ -1956,78 +1957,57 @@ async function loginComCertificado() {
   }
 }
 
-function _certModalSetup(chromePath) {
-  // Modo especial: instrui o usuário a reabrir o Chrome com a flag de debug
-  const modal   = document.getElementById('cert-modal');
-  const overlay = document.getElementById('cert-modal-overlay');
-
-  modal.classList.remove('waiting');
-  document.getElementById('cert-modal-title').textContent = 'Configuração necessária';
-  document.getElementById('cert-modal-desc').innerHTML =
-    'Para autenticar com o certificado, o Chrome precisa ser iniciado com a opção de depuração remota.<br><br>' +
-    '<strong style="color:var(--amber)">Feche o Chrome completamente</strong> e clique em <strong>Abrir Chrome Configurado</strong> abaixo.';
-  document.getElementById('cert-modal-steps').style.display = 'none';
-  document.getElementById('cert-modal-status').textContent  = '';
-  document.getElementById('btn-cert-cancel').textContent    = 'Cancelar';
-
-  // Troca o botão cancelar por dois botões: Abrir Chrome + Cancelar
-  const actionsEl = document.getElementById('cert-modal-actions');
-  if (actionsEl) actionsEl.remove();
-  const actions = document.createElement('div');
-  actions.id = 'cert-modal-actions';
-  actions.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
-  actions.innerHTML = `
-    <button class="btn btn-primary btn-full" onclick="_tentarAbrirChrome()">
-      Abrir Chrome Configurado
-    </button>
-  `;
-  document.getElementById('btn-cert-cancel').before(actions);
-
-  overlay.classList.add('show');
-  _resetCertBtn();
-}
-
-async function _tentarAbrirChrome() {
-  document.getElementById('cert-modal-desc').innerHTML =
-    'Abrindo Chrome com depuração remota...<br>Aguarde alguns segundos e clique em <strong>Tentar novamente</strong>.';
-
-  const actionsEl = document.getElementById('cert-modal-actions');
-  if (actionsEl) actionsEl.innerHTML = `
-    <button class="btn btn-primary btn-full" onclick="_retentar()">
-      Tentar novamente
-    </button>
-  `;
-
-  await fetch('/api/cert-login/open-chrome', { method: 'POST' }).catch(() => {});
-}
-
-async function _retentar() {
-  const actionsEl = document.getElementById('cert-modal-actions');
-  if (actionsEl) actionsEl.remove();
-  document.getElementById('cert-modal-overlay').classList.remove('show');
-  await loginComCertificado();
-}
-
 function _abrirCertModal() {
   const overlay = document.getElementById('cert-modal-overlay');
   const modal   = document.getElementById('cert-modal');
+  const origin  = window.location.origin;
+
   modal.classList.add('waiting');
-  document.getElementById('cert-modal-title').textContent = 'Aguardando autenticação...';
-  document.getElementById('cert-modal-desc').textContent  = 'Conclua o login na janela que foi aberta. Esta tela fechará automaticamente.';
-  document.getElementById('cert-modal-status').textContent = 'Aguardando autenticação...';
-  document.getElementById('cert-modal-steps').style.display = 'flex';
-  document.getElementById('btn-cert-cancel').style.display  = '';
+  document.getElementById('cert-modal-title').textContent = 'Autenticar com Certificado';
+  document.getElementById('cert-modal-desc').innerHTML =
+    'Execute o comando abaixo no <strong>terminal da sua máquina</strong> (onde o token está conectado):';
+
+  // Monta o comando com o sessionId real
+  const cmd = `node agent.js ${_certSessionId} ${origin}`;
+  document.getElementById('cert-modal-steps').innerHTML = `
+    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:4px;">
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);word-break:break-all;line-height:1.6;">${cmd}</div>
+      <button onclick="navigator.clipboard.writeText('${cmd}').then(()=>this.textContent='✓ Copiado!').catch(()=>{})"
+        style="margin-top:8px;font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);
+               background:var(--card-bg);color:var(--text-2);cursor:pointer;">
+        Copiar comando
+      </button>
+    </div>
+    <div class="cert-step" style="margin-top:8px;">
+      <div class="cert-step-num">1</div>
+      <span>Cole e execute o comando no terminal da máquina com o token</span>
+    </div>
+    <div class="cert-step">
+      <div class="cert-step-num">2</div>
+      <span>O Chrome abrirá automaticamente — selecione o certificado <strong>CERTSIGN RFB</strong> e clique em Acessar</span>
+    </div>
+    <div class="cert-step">
+      <div class="cert-step-num">3</div>
+      <span>Digite a <strong>senha do token</strong> no popup do Web PKI</span>
+    </div>
+    <div class="cert-step">
+      <div class="cert-step-num">4</div>
+      <span>Esta tela fechará automaticamente após o login</span>
+    </div>
+  `;
+  document.getElementById('cert-modal-status').textContent = 'Aguardando o agente...';
+  document.getElementById('btn-cert-cancel').textContent   = 'Cancelar';
   overlay.classList.add('show');
 }
 
 async function _verificarStatusCert() {
+  if (!_certSessionId) return;
   try {
-    const r = await fetch('/api/cert-login/status');
+    const r = await fetch(`/api/cert-login/status?sessionId=${_certSessionId}`);
     const d = await r.json();
     const statusEl = document.getElementById('cert-modal-status');
 
     if (d.status === 'done' && d.cookies) {
-      // Login concluído! Valida os cookies e autentica
       clearInterval(_certPollInterval);
       _certPollInterval = null;
 
@@ -2035,7 +2015,6 @@ async function _verificarStatusCert() {
       document.getElementById('cert-modal-steps').style.display = 'none';
       document.getElementById('btn-cert-cancel').style.display  = 'none';
 
-      // Valida no servidor
       const vr = await fetch('/api/validar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2044,30 +2023,25 @@ async function _verificarStatusCert() {
       const vd = await vr.json();
 
       if (vr.ok && vd.sucesso) {
-        // Sucesso — autentica!
         localStorage.setItem('onr_cookies', d.cookies);
         document.getElementById('cert-modal-overlay').classList.remove('show');
         document.getElementById('cert-modal').classList.remove('waiting');
+        _certSessionId = null;
         _resetCertBtn();
         setAuthenticated(true);
       } else {
         _certModalErro('Sessão capturada, mas o ONR recusou os cookies. Tente novamente.');
       }
 
-    } else if (d.status === 'timeout') {
+    } else if (d.status === 'timeout' || d.status === 'expired') {
       clearInterval(_certPollInterval);
       _certPollInterval = null;
-      _certModalErro('Tempo esgotado (3 minutos). Tente novamente.');
-
-    } else if (d.status === 'error') {
-      clearInterval(_certPollInterval);
-      _certPollInterval = null;
-      _certModalErro('Ocorreu um erro durante o login. Tente novamente.');
+      _certSessionId = null;
+      _certModalErro('Tempo esgotado (5 minutos). Clique em fechar e tente novamente.');
 
     } else if (d.status === 'waiting') {
-      // Atualiza status visual com ponto animado
-      const dots = ['Aguardando autenticação', 'Aguardando autenticação.', 'Aguardando autenticação..', 'Aguardando autenticação...'];
-      statusEl.textContent = dots[Math.floor(Date.now() / 600) % 4];
+      const dots = ['Aguardando o agente', 'Aguardando o agente.', 'Aguardando o agente..', 'Aguardando o agente...'];
+      if (statusEl) statusEl.textContent = dots[Math.floor(Date.now() / 700) % 4];
     }
 
   } catch {
@@ -2090,8 +2064,14 @@ async function cancelarLoginCertificado() {
   clearInterval(_certPollInterval);
   _certPollInterval = null;
 
-  // Cancela no servidor (fecha o browser que estava aberto)
-  fetch('/api/cert-login/cancel', { method: 'POST' }).catch(() => {});
+  if (_certSessionId) {
+    fetch('/api/cert-login/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: _certSessionId })
+    }).catch(() => {});
+    _certSessionId = null;
+  }
 
   document.getElementById('cert-modal-overlay').classList.remove('show');
   document.getElementById('cert-modal').classList.remove('waiting');

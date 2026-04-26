@@ -476,212 +476,92 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 // ═══════════════════════════════════════════════════════════
-// LOGIN COM CERTIFICADO DIGITAL — conecta ao Chrome já aberto
-// via remote debugging port 9222
+// LOGIN COM CERTIFICADO DIGITAL — arquitetura agente local
+//
+// A VPS NÃO toca no Chrome nem no token.
+// O agente local (agent.js) roda na máquina do usuário,
+// abre o Chrome localmente, captura os cookies e os envia
+// para a VPS via POST /api/cert-login/push-cookies.
+//
+// Fluxo:
+//   1. Frontend clica em "Login com Certificado"
+//   2. VPS cria uma sessão com ID único (pendente)
+//   3. Frontend instrui o usuário a rodar o agente local
+//   4. Agente abre Chrome local → usuário autentica com token
+//   5. Agente captura cookies e envia para VPS com o session ID
+//   6. Frontend em polling detecta os cookies → loga
 // ═══════════════════════════════════════════════════════════
 
-const { exec, execSync } = require('child_process');
-const os = require('os');
-const fs = require('fs');
+const crypto = require('crypto');
 
-let certSession = null;
+// Sessões pendentes: Map<sessionId, { status, cookies, created }>
+const certSessions = new Map();
 
-function detectChromePath() {
-    const homeDir = os.homedir();
-    const candidates = [
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-        '/usr/bin/google-chrome',
-        '/usr/bin/chromium-browser',
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    ];
-    return candidates.find(p => fs.existsSync(p)) || null;
-}
-
-function detectUserDataDir() {
-    // Usa um diretório temporário dedicado — evita conflito com o Chrome já aberto.
-    // O Web PKI é instalado via registro do Windows e aparece em qualquer perfil.
-    const debugDir = path.join('C:\\Temp', 'ChromeDebug');
-    try { fs.mkdirSync(debugDir, { recursive: true }); } catch {}
-    return debugDir;
-}
-
-async function connectToChrome() {
-    try {
-        const browser = await puppeteer.connect({
-            browserURL: 'http://localhost:9222',
-            defaultViewport: null,
-        });
-        return browser;
-    } catch {
-        return null;
+// Limpa sessões expiradas a cada 5 minutos
+setInterval(() => {
+    const cutoff = Date.now() - 10 * 60 * 1000; // 10 min
+    for (const [id, s] of certSessions) {
+        if (s.created < cutoff) certSessions.delete(id);
     }
-}
+}, 5 * 60 * 1000);
 
-// Verifica se o Chrome está rodando SEM a porta de debug
-// (se sim, precisamos matar e reabrir)
-function isChromeRunningWithoutDebug() {
-    try {
-        if (process.platform === 'win32') {
-            const result = execSync('netstat -ano | findstr :9222', { encoding: 'utf8', timeout: 3000 });
-            return !result || result.trim() === '';
-        }
-        return false;
-    } catch {
-        return true;
-    }
-}
-
-function openChromeWithDebugging() {
-    const chromePath = detectChromePath();
-    if (!chromePath) return false;
-    const userDataDir = detectUserDataDir();
-    const cmd = process.platform === 'win32'
-        ? `powershell -Command "Start-Process '${chromePath}' -ArgumentList '--remote-debugging-port=9222','--user-data-dir=${userDataDir}','--no-first-run'"`
-        : `"${chromePath}" --remote-debugging-port=9222 --user-data-dir="${userDataDir}" --no-first-run &`;
-    console.log('[CERT] Lançando Chrome:', cmd);
-    exec(cmd, (err) => { if (err) console.warn('[CERT] exec:', err.message); });
-    return true;
-}
-
-app.post('/api/cert-login/start', async (req, res) => {
-    if (certSession) {
-        try { await certSession.page.close(); } catch {}
-        certSession = null;
-    }
-
-    console.log('\n[CERT] ── Iniciando login com certificado ──');
-    console.log('[CERT] Tentando conectar ao Chrome na porta 9222...');
-
-    let browser = await connectToChrome();
-
-    if (!browser) {
-        console.log('[CERT] Chrome não está em modo debug. Abrindo automaticamente...');
-        const launched = openChromeWithDebugging();
-        if (!launched) {
-            return res.status(500).json({ ok: false, error: 'Chrome não encontrado no sistema.' });
-        }
-
-        // Aguarda até 15s pelo Chrome estar disponível
-        for (let i = 0; i < 15; i++) {
-            await new Promise(r => setTimeout(r, 1000));
-            browser = await connectToChrome();
-            if (browser) { console.log(`[CERT] ✓ Conectado após ${i+1}s!`); break; }
-            console.log(`[CERT]   aguardando Chrome... (${i+1}/15)`);
-        }
-
-        if (!browser) {
-            return res.status(500).json({
-                ok: false,
-                error: 'Chrome abriu mas não respondeu na porta 9222 em 15 segundos.',
-            });
-        }
-    } else {
-        console.log('[CERT] ✓ Conectado ao Chrome existente!');
-    }
-
-    // Abre aba nova no Chrome do usuário e navega para o ONR
-    try {
-        console.log('[CERT] Abrindo nova aba no Chrome...');
-        const page = await browser.newPage();
-        certSession = { browser, page, status: 'waiting', cookies: null };
-
-        console.log('[CERT] Navegando para o login do ONR...');
-        await page.goto('https://indisponibilidade.onr.org.br/login/certificate', {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000,
-        });
-
-        console.log('[CERT] URL após navegação:', page.url());
-        try { await page.bringToFront(); } catch {}
-        console.log('[CERT] ✓ Aba de login aberta. Aguardando autenticação do usuário...');
-
-    } catch (err) {
-        console.error('[CERT] Erro ao abrir aba:', err.message);
-        certSession = null;
-        return res.status(500).json({ ok: false, error: 'Erro ao abrir aba: ' + err.message });
-    }
-
-    res.json({ ok: true });
-
-    // Monitora cookies em background
-    (async () => {
-        const deadline = Date.now() + 3 * 60 * 1000;
-        const { page } = certSession;
-        try {
-            while (Date.now() < deadline) {
-                await new Promise(r => setTimeout(r, 1500));
-                if (!certSession) break;
-
-                try { await page.evaluate(() => document.readyState); }
-                catch { console.log('[CERT] Aba fechada pelo usuário.'); break; }
-
-                const currentUrl = page.url();
-                const cookies = await page.cookies('https://indisponibilidade.onr.org.br').catch(() => []);
-                const cnibUser = cookies.find(c => c.name === 'CNIB_USER');
-                const cnibAuth = cookies.find(c => c.name === 'CNIB.Auth' || c.name === 'CNIB.AuthC1');
-
-                if (cnibUser || (cnibAuth && currentUrl.includes('indisponibilidade.onr.org.br'))) {
-                    const allCookies = await page.cookies('https://indisponibilidade.onr.org.br').catch(() => []);
-                    const cookieStr = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
-                    console.log(`[CERT] ✓ Login detectado! ${allCookies.length} cookies. URL: ${currentUrl}`);
-                    certSession.status  = 'done';
-                    certSession.cookies = cookieStr;
-                    setTimeout(async () => { try { await page.close(); } catch {} }, 1500);
-                    return;
-                }
-            }
-
-            if (certSession?.status === 'waiting') {
-                console.log('[CERT] Timeout — 3 minutos sem login detectado.');
-                certSession.status = 'timeout';
-                try { await page.close(); } catch {}
-            }
-        } catch (err) {
-            console.error('[CERT] Erro no monitor:', err.message);
-            if (certSession) certSession.status = 'error';
-            try { await page.close(); } catch {}
-        }
-    })();
+// 1. Frontend solicita início de sessão → VPS cria session ID
+app.post('/api/cert-login/start', (req, res) => {
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    certSessions.set(sessionId, {
+        status: 'waiting',
+        cookies: null,
+        created: Date.now(),
+    });
+    console.log(`\n[CERT] Nova sessão criada: ${sessionId}`);
+    res.json({ ok: true, sessionId });
 });
 
+// 2. Agente local envia os cookies capturados para a VPS
+app.post('/api/cert-login/push-cookies', (req, res) => {
+    const { sessionId, cookies } = req.body;
+
+    if (!sessionId || !cookies) {
+        return res.status(400).json({ ok: false, error: 'sessionId e cookies são obrigatórios.' });
+    }
+
+    const session = certSessions.get(sessionId);
+    if (!session) {
+        return res.status(404).json({ ok: false, error: 'Sessão não encontrada ou expirada.' });
+    }
+
+    session.status  = 'done';
+    session.cookies = cookies;
+    console.log(`[CERT] ✓ Cookies recebidos do agente para sessão ${sessionId}`);
+    res.json({ ok: true });
+});
+
+// 3. Frontend faz polling para saber se os cookies chegaram
 app.get('/api/cert-login/status', (req, res) => {
-    if (!certSession) return res.json({ status: 'idle' });
-    const { status, cookies } = certSession;
-    if (status === 'done' && cookies) {
-        const c = cookies;
-        certSession = null;
-        return res.json({ status: 'done', cookies: c });
+    const { sessionId } = req.query;
+    if (!sessionId) return res.status(400).json({ status: 'error', error: 'sessionId obrigatório' });
+
+    const session = certSessions.get(sessionId);
+    if (!session) return res.json({ status: 'expired' });
+
+    // Timeout de 5 minutos
+    if (Date.now() - session.created > 5 * 60 * 1000 && session.status === 'waiting') {
+        certSessions.delete(sessionId);
+        return res.json({ status: 'timeout' });
     }
-    return res.json({ status });
+
+    if (session.status === 'done') {
+        const cookies = session.cookies;
+        certSessions.delete(sessionId);
+        return res.json({ status: 'done', cookies });
+    }
+
+    res.json({ status: 'waiting' });
 });
 
-app.post('/api/cert-login/cancel', async (req, res) => {
-    if (certSession) {
-        try { await certSession.page.close(); } catch {}
-        certSession = null;
-    }
-    res.json({ ok: true });
-});
-
-// Abre o Chrome com remote debugging (chamado pela tela de setup)
-app.post('/api/cert-login/open-chrome', (req, res) => {
-    const chromePath = detectChromePath();
-    if (!chromePath) return res.status(404).json({ ok: false, error: 'Chrome não encontrado.' });
-
-    const userDataDir = detectUserDataDir();
-
-    // Start-Process é necessário no Windows para lançar o Chrome como processo independente
-    // com flags — o exec normal às vezes passa para instância existente que ignora as flags
-    const cmd = process.platform === 'win32'
-        ? `powershell -Command "Start-Process '${chromePath}' -ArgumentList '--remote-debugging-port=9222','--user-data-dir=${userDataDir}','--no-first-run'"`
-        : `"${chromePath}" --remote-debugging-port=9222 --user-data-dir="${userDataDir}" --no-first-run &`;
-
-    console.log('[CERT] Abrindo Chrome com debug:', cmd);
-    exec(cmd, (err) => { if (err) console.warn('[CERT] exec:', err.message); });
+app.post('/api/cert-login/cancel', (req, res) => {
+    const { sessionId } = req.body;
+    if (sessionId) certSessions.delete(sessionId);
     res.json({ ok: true });
 });
 
