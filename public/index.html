@@ -1960,31 +1960,44 @@ async function loginComCertificado() {
 function _abrirCertModal() {
   const overlay = document.getElementById('cert-modal-overlay');
   const modal   = document.getElementById('cert-modal');
-  const origin  = window.location.origin;
+  const host    = window.location.host; // ex: cnib.jumoreira.online
+  const proto   = `cnib://${_certSessionId}@${host}`;
 
-  modal.classList.add('waiting');
+  modal.classList.remove('waiting'); // começa sem spinner — mostra instrução primeiro
   document.getElementById('cert-modal-title').textContent = 'Autenticar com Certificado';
   document.getElementById('cert-modal-desc').innerHTML =
-    'Execute o comando abaixo no <strong>terminal da sua máquina</strong> (onde o token está conectado):';
+    'Clique no botão abaixo para abrir o agente CNIB na sua máquina e autenticar com o token.';
 
-  // Monta o comando com o sessionId real
-  const cmd = `node agent.js ${_certSessionId} ${origin}`;
   document.getElementById('cert-modal-steps').innerHTML = `
-    <div style="background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:4px;">
-      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);word-break:break-all;line-height:1.6;">${cmd}</div>
-      <button onclick="navigator.clipboard.writeText('${cmd}').then(()=>this.textContent='✓ Copiado!').catch(()=>{})"
-        style="margin-top:8px;font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);
-               background:var(--card-bg);color:var(--text-2);cursor:pointer;">
-        Copiar comando
-      </button>
+    <div style="text-align:center;margin-bottom:4px;">
+      <a href="${proto}"
+         onclick="setTimeout(_aguardarAgente, 1500)"
+         style="display:inline-flex;align-items:center;gap:10px;
+                padding:13px 24px;border-radius:10px;
+                background:var(--blue);color:#fff;font-weight:600;
+                font-size:14px;text-decoration:none;border:none;cursor:pointer;
+                transition:opacity .2s;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        Abrir Agente CNIB
+      </a>
     </div>
-    <div class="cert-step" style="margin-top:8px;">
+    <div id="cert-setup-hint" style="font-size:11px;color:var(--text-3);text-align:center;margin-top:10px;">
+      Primeira vez? 
+      <a href="/cnib-agent-setup.zip" download
+         style="color:var(--blue);text-decoration:underline;">
+        Baixe e configure o agente
+      </a>
+      (uma vez só)
+    </div>
+    <div class="cert-step" style="margin-top:12px;">
       <div class="cert-step-num">1</div>
-      <span>Cole e execute o comando no terminal da máquina com o token</span>
+      <span>Clique em <strong>Abrir Agente CNIB</strong> acima</span>
     </div>
     <div class="cert-step">
       <div class="cert-step-num">2</div>
-      <span>O Chrome abrirá automaticamente — selecione o certificado <strong>CERTSIGN RFB</strong> e clique em Acessar</span>
+      <span>No Chrome que abrir, selecione o certificado <strong>CERTSIGN RFB</strong> e clique em Acessar</span>
     </div>
     <div class="cert-step">
       <div class="cert-step-num">3</div>
@@ -1992,12 +2005,23 @@ function _abrirCertModal() {
     </div>
     <div class="cert-step">
       <div class="cert-step-num">4</div>
-      <span>Esta tela fechará automaticamente após o login</span>
+      <span>Esta tela fechará automaticamente</span>
     </div>
   `;
-  document.getElementById('cert-modal-status').textContent = 'Aguardando o agente...';
+
+  document.getElementById('cert-modal-status').textContent = 'Aguardando abertura do agente...';
   document.getElementById('btn-cert-cancel').textContent   = 'Cancelar';
   overlay.classList.add('show');
+}
+
+// Chamado após o usuário clicar no link cnib:// — ativa o spinner e polling
+function _aguardarAgente() {
+  const modal = document.getElementById('cert-modal');
+  modal.classList.add('waiting');
+  document.getElementById('cert-modal-status').textContent = 'Aguardando autenticação...';
+  if (!_certPollInterval) {
+    _certPollInterval = setInterval(_verificarStatusCert, 2500);
+  }
 }
 
 async function _verificarStatusCert() {
