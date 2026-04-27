@@ -1058,12 +1058,20 @@ async function generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename)
 
     if (!res.ok) {
       if (btn) btn.disabled = false;
-      const err = await res.json().catch(() => ({erro:'Erro desconhecido'}));
-      showMsg('msg-pesquisa', err.erro || 'Erro ao gerar PDF Clone.', 'error');
+      const err = await res.json().catch(() => ({erro:'Erro ao processar requisição'}));
+      console.error('[PDF-CLONE] Erro do servidor:', err);
+      showMsg('msg-pesquisa', `Erro ao gerar PDF Clone: ${err.erro || 'Erro desconhecido'}`, 'error');
       return;
     }
 
     const blob = await res.blob();
+    
+    if (blob.size === 0) {
+      if (btn) btn.disabled = false;
+      console.error('[PDF-CLONE] Blob vazio recebido');
+      showMsg('msg-pesquisa', 'Erro: PDF Clone vazio. Tente novamente.', 'error');
+      return;
+    }
     
     // Salva silenciosamente na pasta ou faz download
     await savePDFBlobSilent(blob, filename, 'PDF Clone gerado com sucesso');
@@ -1071,8 +1079,8 @@ async function generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename)
     if (btn) btn.disabled = false;
   } catch (err) {
     if (btn) btn.disabled = false;
-    console.error('Erro ao gerar PDF Clone:', err);
-    showMsg('msg-pesquisa', 'Erro ao gerar PDF Clone. Tente novamente.', 'error');
+    console.error('[PDF-CLONE] Erro ao gerar PDF Clone:', err);
+    showMsg('msg-pesquisa', `Erro ao gerar PDF Clone: ${err.message || 'Erro desconhecido'}`, 'error');
   }
 }
 
@@ -2091,14 +2099,16 @@ async function loginComCertificado() {
     }
 
     _certSessionId = d.sessionId;
+    console.log('[LOGIN CERT] Sessão criada:', _certSessionId);
 
     // 2. Mostra modal com instrução para rodar o agente
     _abrirCertModal();
 
-    // 3. Inicia polling aguardando o agente enviar os cookies
-    _certPollInterval = setInterval(_verificarStatusCert, 2500);
+    // 3. Inicia polling aguardando o agente enviar os cookies (polling mais frequente)
+    _certPollInterval = setInterval(_verificarStatusCert, 1500); // Reduzido de 2500ms para 1500ms
 
   } catch (err) {
+    console.error('[LOGIN CERT] Erro ao conectar:', err);
     showMsg('msg-auth', 'Erro ao conectar com o servidor.', 'error');
     _resetCertBtn();
   }
@@ -2166,45 +2176,69 @@ function _aguardarAgente() {
   const modal = document.getElementById('cert-modal');
   modal.classList.add('waiting');
   document.getElementById('cert-modal-status').textContent = 'Aguardando autenticação...';
+  console.log('[CERT MODAL] Ativando polling para agente...');
   if (!_certPollInterval) {
-    _certPollInterval = setInterval(_verificarStatusCert, 2500);
+    _certPollInterval = setInterval(_verificarStatusCert, 1500); // Frequência aumentada
   }
 }
 
 async function _verificarStatusCert() {
   if (!_certSessionId) return;
   try {
-    const r = await fetch(`/api/cert-login/status?sessionId=${_certSessionId}`);
+    const r = await fetch(`/api/cert-login/status?sessionId=${_certSessionId}`, {
+      timeout: 5000
+    });
     const d = await r.json();
     const statusEl = document.getElementById('cert-modal-status');
 
+    if (!r.ok) {
+      console.error('[CERT POLLING] Erro no servidor:', r.status, d);
+      if (statusEl) statusEl.textContent = 'Erro ao conectar com o servidor...';
+      return;
+    }
+
+    console.log('[CERT POLLING] Status:', d.status, '| Cookies:', !!d.cookies);
+
     if (d.status === 'done' && d.cookies) {
+      console.log('[CERT POLLING] ✓ Cookies recebidos! Validando...');
       clearInterval(_certPollInterval);
       _certPollInterval = null;
 
-      statusEl.textContent = 'Login detectado! Validando sessão...';
+      if (statusEl) statusEl.textContent = 'Login detectado! Validando sessão...';
       document.getElementById('cert-modal-steps').style.display = 'none';
       document.getElementById('btn-cert-cancel').style.display  = 'none';
 
-      const vr = await fetch('/api/validar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cookies: d.cookies })
-      });
-      const vd = await vr.json();
+      try {
+        const vr = await fetch('/api/validar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookies: d.cookies })
+        });
+        const vd = await vr.json();
 
-      if (vr.ok && vd.sucesso) {
-        localStorage.setItem('onr_cookies', d.cookies);
-        document.getElementById('cert-modal-overlay').classList.remove('show');
-        document.getElementById('cert-modal').classList.remove('waiting');
-        _certSessionId = null;
-        _resetCertBtn();
-        setAuthenticated(true);
-      } else {
-        _certModalErro('Sessão capturada, mas o ONR recusou os cookies. Tente novamente.');
+        if (vr.ok && vd.sucesso) {
+          console.log('[CERT LOGIN] ✓ Autenticação bem-sucedida!');
+          localStorage.setItem('onr_cookies', d.cookies);
+          
+          // Aguarda um pouco para a UI ser confortável antes de fechar
+          await new Promise(r => setTimeout(r, 800));
+          
+          document.getElementById('cert-modal-overlay').classList.remove('show');
+          document.getElementById('cert-modal').classList.remove('waiting');
+          _certSessionId = null;
+          _resetCertBtn();
+          setAuthenticated(true);
+        } else {
+          console.error('[CERT LOGIN] ✗ Validação falhou:', vd);
+          _certModalErro('Sessão capturada, mas o ONR recusou os cookies. Tente novamente.');
+        }
+      } catch (validErr) {
+        console.error('[CERT LOGIN] ✗ Erro ao validar:', validErr);
+        _certModalErro('Erro ao validar sessão. Tente novamente.');
       }
 
     } else if (d.status === 'timeout' || d.status === 'expired') {
+      console.warn('[CERT POLLING] Sessão expirada:', d.status);
       clearInterval(_certPollInterval);
       _certPollInterval = null;
       _certSessionId = null;
@@ -2212,15 +2246,21 @@ async function _verificarStatusCert() {
 
     } else if (d.status === 'waiting') {
       const dots = ['Aguardando o agente', 'Aguardando o agente.', 'Aguardando o agente..', 'Aguardando o agente...'];
-      if (statusEl) statusEl.textContent = dots[Math.floor(Date.now() / 700) % 4];
+      const msg = dots[Math.floor(Date.now() / 700) % 4];
+      if (statusEl) statusEl.textContent = msg;
     }
 
-  } catch {
+  } catch (err) {
+    console.error('[CERT POLLING] Erro na requisição:', err);
     // Ignora erros de rede passageiros no polling
   }
 }
 
 function _certModalErro(msg) {
+  console.error('[CERT ERROR]', msg);
+  clearInterval(_certPollInterval);
+  _certPollInterval = null;
+  
   const modal   = document.getElementById('cert-modal');
   const overlay = document.getElementById('cert-modal-overlay');
   modal.classList.remove('waiting');
@@ -2252,7 +2292,15 @@ async function cancelarLoginCertificado() {
 
 function _resetCertBtn() {
   const btn = document.getElementById('btn-cert-login');
-  if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  if (btn) { 
+    btn.disabled = false; 
+    btn.classList.remove('loading'); 
+  }
+  // Garante que o polling seja parado mesmo se houver erro
+  if (_certPollInterval) {
+    clearInterval(_certPollInterval);
+    _certPollInterval = null;
+  }
 }
 
 // ── UTILS ──────────────────────────────────────────────────

@@ -224,6 +224,14 @@ function pushCookies(cookies) {
 
 // ── MAIN ────────────────────────────────────────────────────
 (async () => {
+    console.log('\n╔════════════════════════════════════════════╗');
+    console.log('║  CNIB — Agente Local de Autenticação      ║');
+    console.log('║  Versão 2.0 — Debug Mode Ativo            ║');
+    console.log('╚════════════════════════════════════════════╝\n');
+    console.log(`Session ID: ${SESSION_ID}`);
+    console.log(`VPS URL:    ${VPS_URL}`);
+    console.log(`Timeout:    ${TIMEOUT_MS / 1000}s\n`);
+
     // 1. Abre o Chrome se não estiver aberto com debug
     const portJaAberta = await isPortOpen();
 
@@ -233,20 +241,27 @@ function pushCookies(cookies) {
             showMsg('Google Chrome não encontrado. Por favor instale o Chrome e tente novamente.');
             process.exit(1);
         }
+        console.log(`[AGENT] Iniciando Chrome em ${chromePath}...`);
         await openChrome(chromePath);
 
         // Aguarda até 15s a porta abrir
+        console.log('[AGENT] Aguardando porta de debug 9222...');
         let abriu = false;
         for (let i = 0; i < 15; i++) {
             await new Promise(r => setTimeout(r, 1000));
             abriu = await isPortOpen();
-            if (abriu) break;
+            if (abriu) {
+                console.log('[AGENT] ✓ Chrome respondendo na porta 9222');
+                break;
+            }
         }
 
         if (!abriu) {
             showMsg('Chrome não iniciou corretamente. Tente fechar o Chrome e tentar novamente.');
             process.exit(1);
         }
+    } else {
+        console.log('[AGENT] Chrome já está em execução na porta 9222');
     }
 
     // 2. Abre aba do ONR diretamente via Chrome CLI
@@ -260,21 +275,29 @@ function pushCookies(cookies) {
         process.exit(1);
     }
 
+    console.log(`\n[AGENT] Abrindo aba do ONR em ${ONR_URL}...`);
+
     await new Promise((resolve) => {
         const cmd = `powershell -WindowStyle Hidden -Command "Start-Process '${chromePath}' -ArgumentList '${ONR_URL}','--remote-debugging-port=${DEBUG_PORT}'"`;
         exec(cmd, () => resolve());
     });
 
     // Aguarda a aba carregar
-    await new Promise(r => setTimeout(r, 2500));
+    console.log('[AGENT] Aguardando carregamento da página...');
+    await new Promise(r => setTimeout(r, 3500));
 
-    // 4. Monitora cookies via polling
+    // 4. Monitora cookies via polling melhorado
     const deadline      = Date.now() + TIMEOUT_MS;
     let cookieStr       = null;
     let onrTabIdToClose = null;
+    let lastErrorLog    = 0;
+    let pollCount       = 0;
+
+    console.log('\n[AGENT] Iniciando polling de cookies...');
 
     while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 2000));
+        pollCount++;
 
         // Usa /json/list para verificar a URL atual da aba
         const pages = await new Promise((resolve) => {
@@ -290,23 +313,29 @@ function pushCookies(cookies) {
             p.url && p.url.includes('indisponibilidade.onr.org.br') && p.type === 'page'
         );
 
-        if (!onrTab) continue;
+        if (!onrTab) {
+            if (Date.now() - lastErrorLog > 10000) {
+                console.log(`[AGENT] Poll #${pollCount}: Aba ONR não encontrada ainda...`);
+                lastErrorLog = Date.now();
+            }
+            continue;
+        }
 
-        // Verifica cookies via Network.getCookies pelo WebSocket
+        console.log(`[AGENT] Poll #${pollCount}: Aba ONR encontrada — URL: ${onrTab.url}`);
+
+        // Verifica cookies via Network.getCookies pelo WebSocket com melhor tratamento
         const cookies = await new Promise((resolve) => {
             const wsDebugUrl = onrTab.webSocketDebuggerUrl;
-            if (!wsDebugUrl) return resolve(null);
-
-            const reqMsg = JSON.stringify({ id: 1, method: 'Network.getCookies', params: { urls: ['https://indisponibilidade.onr.org.br'] } });
-            const buf    = Buffer.from(reqMsg);
-            const frame  = Buffer.alloc(2 + buf.length);
-            frame[0] = 0x81; frame[1] = buf.length;
-            buf.copy(frame, 2);
+            if (!wsDebugUrl) {
+                console.log(`[AGENT] Poll #${pollCount}: webSocketDebuggerUrl não disponível`);
+                return resolve(null);
+            }
 
             const wsPath = new URL(wsDebugUrl).pathname;
             const key    = Buffer.from('cnib' + Math.random()).toString('base64');
 
             const sock = net.createConnection({ host: '127.0.0.1', port: DEBUG_PORT }, () => {
+                console.log(`[AGENT] Poll #${pollCount}: Conectado ao WebSocket CDP`);
                 sock.write([
                     `GET ${wsPath} HTTP/1.1`, `Host: localhost:${DEBUG_PORT}`,
                     'Upgrade: websocket', 'Connection: Upgrade',
@@ -316,54 +345,118 @@ function pushCookies(cookies) {
 
             let upgraded = false;
             let result   = null;
-            sock.setTimeout(4000);
+            let buffer   = Buffer.alloc(0);
+            let cmdSent  = false;
+            let msgId    = 1;
+            sock.setTimeout(6000);
 
             sock.on('data', (chunk) => {
                 if (!upgraded) {
                     if (chunk.toString().includes('101')) {
                         upgraded = true;
+                        console.log(`[AGENT] Poll #${pollCount}: Handshake completo, enviando Network.getCookies...`);
+                        // Envia Network.getCookies assim que o handshake completa
+                        const reqMsg = JSON.stringify({ id: msgId++, method: 'Network.getCookies', params: { urls: ['https://indisponibilidade.onr.org.br'] } });
+                        const buf    = Buffer.from(reqMsg);
+                        const frame  = Buffer.alloc(2 + buf.length);
+                        frame[0] = 0x81; frame[1] = buf.length;
+                        buf.copy(frame, 2);
                         sock.write(frame);
+                        cmdSent = true;
                     }
                     return;
                 }
-                try {
-                    // Extrai payload do frame WebSocket
-                    let offset = 2;
-                    const len  = chunk[1] & 0x7f;
-                    if (len === 126) offset += 2;
-                    else if (len === 127) offset += 8;
-                    const payload = chunk.slice(offset).toString();
-                    const msg     = JSON.parse(payload);
-                    if (msg.result && msg.result.cookies) {
-                        result = msg.result.cookies;
-                        sock.destroy();
-                        resolve(result);
+
+                // Acumula dados no buffer
+                buffer = Buffer.concat([buffer, chunk]);
+
+                // Tenta parsear frames WebSocket acumulados
+                let offset = 0;
+                while (offset < buffer.length && offset + 2 <= buffer.length) {
+                    const fin = (buffer[offset] & 0x80) !== 0;
+                    const opcode = buffer[offset] & 0x0f;
+                    let payloadStart = offset + 2;
+                    let payloadLen = buffer[offset + 1] & 0x7f;
+
+                    if (payloadLen === 126 && offset + 4 <= buffer.length) {
+                        payloadLen = buffer.readUInt16BE(offset + 2);
+                        payloadStart = offset + 4;
+                    } else if (payloadLen === 127 && offset + 10 <= buffer.length) {
+                        payloadLen = Number(buffer.readBigUInt64BE(offset + 2));
+                        payloadStart = offset + 10;
                     }
-                } catch {}
+
+                    if (payloadStart + payloadLen > buffer.length) break;
+
+                    const payloadEnd = payloadStart + payloadLen;
+                    if (opcode === 1) { // text frame
+                        try {
+                            const payload = buffer.slice(payloadStart, payloadEnd).toString();
+                            const msg = JSON.parse(payload);
+                            
+                            // Verifica se é resposta do Network.getCookies
+                            if (msg.result && msg.result.cookies && Array.isArray(msg.result.cookies)) {
+                                console.log(`[AGENT] Poll #${pollCount}: Cookies recebidos! Total: ${msg.result.cookies.length}`);
+                                result = msg.result.cookies;
+                                sock.destroy();
+                                resolve(result);
+                                return;
+                            }
+                        } catch (e) {
+                            // JSON parse error — continua
+                        }
+                    }
+
+                    offset = payloadEnd;
+                }
+
+                // Remove dados já processados do buffer
+                if (offset > 0) {
+                    buffer = buffer.slice(offset);
+                }
             });
-            sock.on('error', () => resolve(null));
-            sock.on('timeout', () => { sock.destroy(); resolve(null); });
-            sock.on('close', () => { if (!result) resolve(null); });
+
+            sock.on('error', (err) => {
+                console.log(`[AGENT] Poll #${pollCount}: Erro WebSocket — ${err.message}`);
+                resolve(null);
+            });
+            sock.on('timeout', () => {
+                console.log(`[AGENT] Poll #${pollCount}: Timeout na chamada Network.getCookies`);
+                sock.destroy();
+                resolve(null);
+            });
+            sock.on('close', () => {
+                if (!result) {
+                    console.log(`[AGENT] Poll #${pollCount}: Socket fechado, sem cookies encontrados`);
+                }
+            });
         });
 
         if (cookies) {
             const cnibUser = cookies.find(c => c.name === 'CNIB_USER');
             const cnibAuth = cookies.find(c => c.name === 'CNIB.Auth' || c.name === 'CNIB.AuthC1');
             if (cnibUser || cnibAuth) {
+                console.log(`[AGENT] ✓ Cookies de autenticação detectados! CNIB_USER=${!!cnibUser}, CNIB.Auth=${!!cnibAuth}`);
                 cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
                 // Guarda o ID da aba para fechar depois
                 onrTabIdToClose = onrTab.id;
                 break;
+            } else {
+                console.log(`[AGENT] Poll #${pollCount}: Cookies encontrados mas sem auth válida — ${cookies.length} cookies`);
             }
         }
     }
 
     if (!cookieStr) {
+        console.log(`\n[AGENT] ✗ FALHA: Timeout de ${TIMEOUT_MS / 1000}s esgotado sem autenticação detectada.\n`);
         showMsg('Tempo esgotado sem autenticação detectada. Tente novamente.');
         process.exit(1);
     }
 
+    console.log(`\n[AGENT] ✓ Sucesso! Autenticação capturada com sucesso.\n`);
+
     // 5. Fecha todas as abas do ONR abertas pelo agente
+    console.log(`\n[AGENT] Fechando abas do ONR...`);
     await new Promise((resolve) => {
         // Lista todas as abas abertas
         http.get(`http://localhost:${DEBUG_PORT}/json/list`, { timeout: 3000 }, (res) => {
@@ -380,7 +473,11 @@ function pushCookies(cookies) {
                         )
                     );
                     let closed = 0;
-                    if (toClose.length === 0) return resolve();
+                    if (toClose.length === 0) {
+                        console.log(`[AGENT] Nenhuma aba para fechar.`);
+                        return resolve();
+                    }
+                    console.log(`[AGENT] Fechando ${toClose.length} aba(s)...`);
                     toClose.forEach(p => {
                         http.get(`http://localhost:${DEBUG_PORT}/json/close/${p.id}`, () => {
                             if (++closed >= toClose.length) resolve();
@@ -392,14 +489,17 @@ function pushCookies(cookies) {
     });
 
     // 6. Envia cookies para a VPS
+    console.log(`[AGENT] Enviando cookies para ${VPS_URL}/api/cert-login/push-cookies...`);
     try {
         const result = await pushCookies(cookieStr);
         if (result.ok) {
-            // Silencioso — o site detecta automaticamente
+            console.log(`[AGENT] ✓ Cookies enviados com sucesso!\n`);
         } else {
+            console.log(`[AGENT] ✗ Erro ao enviar cookies: ${result.error}\n`);
             showMsg('Erro ao enviar sessão para o servidor. Tente novamente.');
         }
     } catch (err) {
+        console.log(`[AGENT] ✗ Erro de conexão: ${err.message}\n`);
         showMsg('Erro de conexão com o servidor: ' + err.message);
     }
 

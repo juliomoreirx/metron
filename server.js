@@ -13,7 +13,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ═══════════════════════════════════════════════════════════
 // PUPPETEER POOL — reutiliza uma única instância do browser
@@ -501,23 +502,49 @@ app.post('/api/pdf-clone', async (req, res) => {
         const hash = 'vzkkait5zq';
         const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://indisponibilidade.onr.org.br/home/validar';
         
-        // Caminhos das imagens locais
+        // Carrega imagens como Base64 para Puppeteer
         const assetsDir = path.join(__dirname, 'public', 'assets');
-        const imgCnib = 'file://' + assetsDir.replace(/\\/g, '/') + '/CNIB-EXTENSO-AZUL.png';
-        const imgOnr = 'file://' + assetsDir.replace(/\\/g, '/') + '/logo-onr-novo.png';
+        let imgCnibBase64 = '';
+        let imgOnrBase64 = '';
+        
+        try {
+            const cnibImagePath = path.join(assetsDir, 'CNIB-EXTENSO-AZUL.png');
+            const onrImagePath = path.join(assetsDir, 'logo-onr-novo.png');
+            
+            if (fs.existsSync(cnibImagePath)) {
+                const cnibData = fs.readFileSync(cnibImagePath);
+                imgCnibBase64 = 'data:image/png;base64,' + cnibData.toString('base64');
+                console.log(`[PDF-CLONE] ✓ Imagem CNIB carregada (${cnibData.length} bytes)`);
+            } else {
+                console.warn(`[PDF-CLONE] ⚠ Arquivo CNIB não encontrado: ${cnibImagePath}`);
+            }
+            
+            if (fs.existsSync(onrImagePath)) {
+                const onrData = fs.readFileSync(onrImagePath);
+                imgOnrBase64 = 'data:image/png;base64,' + onrData.toString('base64');
+                console.log(`[PDF-CLONE] ✓ Imagem ONR carregada (${onrData.length} bytes)`);
+            } else {
+                console.warn(`[PDF-CLONE] ⚠ Arquivo ONR não encontrado: ${onrImagePath}`);
+            }
+        } catch (imgErr) {
+            console.error(`[PDF-CLONE] Erro ao carregar imagens: ${imgErr.message}`);
+        }
 
         // HTML dos resultados
         let htmlRes = '';
         if (isNeg) {
             htmlRes = '<div class="result-container"><div class="result-text-neg">NÃO FORAM ENCONTRADA(S) INDISPONIBILIDADE(S) GENÉRICA(S) E<br>ESPECÍFICA(S) PARA O DOCUMENTO PESQUISADO</div></div>';
         } else {
-            htmlRes = '<div class="result-text-pos">Constam no cadastro da CNIB, as seguintes ocorrências:</div><div class="items-list">';
-            ordersArray.forEach(o => {
+            htmlRes = '<div class="result-text-pos">Constam no cadastro da CNIB, as seguintes ocorrências:</div>';
+            
+            // Separa indisponibilidades para melhor paginação
+            htmlRes += '<div class="items-list">';
+            ordersArray.forEach((o, idx) => {
                 htmlRes += '<div class="item-box">' +
-                    '<div class="item-line"><span class="item-label">PROTOCOLO:</span> ' + h(o.protocol || '—') + '</div>' +
-                    '<div class="item-line"><span class="item-label">NÚMERO DO PROCESSO:</span> ' + h(o.processNumber || '—') + '</div>' +
-                    '<div class="item-line"><span class="item-label">TIPO:</span> ' + h(o.processName || '—') + '</div>' +
-                    '<div class="item-line"><span class="item-label">EMISSOR DA ORDEM:</span> ' + h(o.organizationLabel || '—') + '</div>' +
+                    '<div class="item-line"><span class="item-label">PROTOCOLO:</span>' + h(o.protocol || '—') + '</div>' +
+                    '<div class="item-line"><span class="item-label">NÚMERO DO PROCESSO:</span>' + h(o.processNumber || '—') + '</div>' +
+                    '<div class="item-line"><span class="item-label">TIPO:</span>' + h(o.processName || '—') + '</div>' +
+                    '<div class="item-line"><span class="item-label">EMISSOR DA ORDEM:</span>' + h(o.organizationLabel || '—') + '</div>' +
                     '</div>';
             });
             htmlRes += '</div>';
@@ -526,23 +553,31 @@ app.post('/api/pdf-clone', async (req, res) => {
         const css = `
             * { box-sizing: border-box; margin: 0; padding: 0; }
             body { font-family: Arial, sans-serif; color: #000; font-size: 9.5pt; line-height: 1.3; background: #fff; }
-            @page { margin: 15mm 20mm; size: A4; }
-            .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid #000; margin-bottom: 25px; }
+            @page { margin: 15mm 20mm; size: A4; orphans: 2; widows: 2; }
+            .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid #000; margin-bottom: 25px; page-break-after: avoid; }
             .logo { max-width: 150px; height: auto; }
-            .main-title { font-size: 16pt; font-weight: bold; margin-bottom: 25px; }
-            .sec-header { font-size: 13pt; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 15px; }
-            .dados-grid { display: flex; margin-bottom: 25px; gap: 40px; }
+            .main-title { font-size: 16pt; font-weight: bold; margin-bottom: 25px; page-break-after: avoid; }
+            .sec-header { font-size: 13pt; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 15px; page-break-after: avoid; page-break-inside: avoid; }
+            .dados-grid { display: flex; margin-bottom: 25px; gap: 40px; page-break-after: avoid; }
             .dados-col { flex: 1; }
             .dados-label { font-size: 8pt; font-weight: bold; text-transform: uppercase; margin-bottom: 3px; }
             .dados-val { font-size: 10pt; text-transform: uppercase; }
-            .res-label { font-size: 13pt; font-weight: bold; margin-bottom: 20px; }
+            .res-label { font-size: 13pt; font-weight: bold; margin-bottom: 20px; page-break-after: avoid; }
             .result-container { margin-bottom: 35px; }
             .result-text-neg { font-weight: bold; font-size: 11pt; }
-            .result-text-pos { margin-bottom: 20px; font-size: 10pt; }
-            .item-box { margin-bottom: 25px; page-break-inside: avoid; }
-            .item-line { margin-bottom: 4px; font-size: 9.5pt; text-transform: uppercase; }
-            .item-label { font-weight: bold; }
-            .legal-text { font-size: 9pt; text-align: justify; margin-bottom: 10px; }
+            .result-text-pos { margin-bottom: 20px; font-size: 10pt; page-break-after: avoid; }
+            .items-list { page-break-inside: avoid; margin-bottom: 25px; }
+            .item-box { 
+                margin-bottom: 20px; 
+                padding: 12px; 
+                border: 1px solid #d0d0d0; 
+                page-break-inside: auto;
+                break-inside: auto;
+            }
+            .item-box:nth-child(n+2) { page-break-before: auto; }
+            .item-line { margin-bottom: 5px; font-size: 9.5pt; text-transform: uppercase; }
+            .item-label { font-weight: bold; min-width: 160px; display: inline-block; }
+            .legal-text { font-size: 9pt; text-align: justify; margin-bottom: 10px; orphans: 3; widows: 3; }
             .validation-box { border: 1px solid #a0a0a0; padding: 15px; margin-top: 30px; display: flex; align-items: center; page-break-inside: avoid; }
             .qr-wrapper { border-right: 1px solid #a0a0a0; padding-right: 20px; margin-right: 20px; }
             .qr-code { width: 80px; height: 80px; display: block; }
@@ -554,7 +589,7 @@ app.post('/api/pdf-clone', async (req, res) => {
             .footer-table td { padding: 10px; font-size: 8pt; border-right: 1px solid #a0a0a0; border-bottom: 1px solid #a0a0a0; }
             .footer-table td:last-child { border-right: none; }
             .ft-label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 7.5pt; }
-            .page-footer { display: flex; justify-content: space-between; margin-top: 40px; font-size: 7.5pt; border-top: 1px solid #ccc; padding-top: 10px; }
+            .page-footer { display: flex; justify-content: space-between; margin-top: 40px; font-size: 7.5pt; border-top: 1px solid #ccc; padding-top: 10px; page-break-inside: avoid; }
         `;
 
         const html = `<!DOCTYPE html>
@@ -566,8 +601,8 @@ app.post('/api/pdf-clone', async (req, res) => {
 </head>
 <body>
     <div class="header">
-        <img src="${imgCnib}" class="logo" onerror="this.style.display='none'">
-        <img src="${imgOnr}" class="logo" onerror="this.style.display='none'">
+        ${imgCnibBase64 ? `<img src="${imgCnibBase64}" class="logo" style="max-width:150px; height:auto;">` : ''}
+        ${imgOnrBase64 ? `<img src="${imgOnrBase64}" class="logo" style="max-width:150px; height:auto;">` : ''}
     </div>
     <div class="main-title">Relatório de Consulta de Indisponibilidade de Bens</div>
     <div class="sec-header">Dados Pesquisados</div>
@@ -594,12 +629,26 @@ app.post('/api/pdf-clone', async (req, res) => {
 </html>`;
 
         // Gera PDF via Puppeteer
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
+        
+        // Aguarda imagens carregarem (especialmente importante para Base64)
+        try {
+            await page.waitForFunction(() => {
+                const imgs = Array.from(document.querySelectorAll('img'));
+                return imgs.length === 0 || imgs.every(img => img.complete);
+            }, { timeout: 3000 }).catch(() => {
+                console.warn('[PDF-CLONE] ⚠ Timeout esperando imagens, continuando...');
+            });
+        } catch (e) {
+            console.warn('[PDF-CLONE] ⚠ Erro ao aguardar imagens:', e.message);
+        }
+        
         const pdfBuffer = await page.pdf({
             format: 'A4',
-            margin: { top: '15mm', right: '20mm', bottom: '20mm', left: '20mm' },
+            margin: { top: '15mm', right: '20mm', bottom: '15mm', left: '20mm' },
             printBackground: true,
             displayHeaderFooter: false,
+            scale: 1,
         });
 
         await page.close();
@@ -607,12 +656,21 @@ app.post('/api/pdf-clone', async (req, res) => {
 
         res.set('Content-Type', 'application/pdf');
         res.set('Content-Length', pdfBuffer.length);
-        console.log(`[PDF-CLONE] ✓ PDF Clone gerado (${pdfBuffer.length} bytes)`);
+        console.log(`[PDF-CLONE] ✓ PDF Clone gerado com ${ordersArray.length} indisponibilidade(s) + 2 logos (${pdfBuffer.length} bytes)`);
         res.send(pdfBuffer);
 
     } catch (err) {
-        console.error(`[PDF-CLONE] Erro: ${err.message}`);
-        return res.status(500).json({ erro: `Falha ao gerar PDF Clone: ${err.message}` });
+        console.error(`[PDF-CLONE] ✗ Erro ao gerar: ${err.message}`);
+        console.error(`[PDF-CLONE] Stack: ${err.stack}`);
+        try {
+            await page.close();
+        } catch (e) {
+            // Ignora erro ao fechar página
+        }
+        return res.status(500).json({ 
+            erro: `Falha ao gerar PDF Clone: ${err.message}`,
+            details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
     }
 });
 
