@@ -466,10 +466,9 @@ app.post('/api/pdf', async (req, res) => {
 });
 
 // ── POST /api/pdf-clone ────────────────────────────────────────
-// Gera PDF Clone via Puppeteer - cria um documento texto formatado
-// que replica o estrutura visual do CNIB sem dependência do servidor ONR
+// Gera PDF Clone via Puppeteer - monta HTML correto do CNIB e gera PDF
 app.post('/api/pdf-clone', async (req, res) => {
-    const { cookies, documento, responsavelNome, responsavelCPF } = req.body;
+    const { cookies, documento, responsavelNome, responsavelCPF, orders, nomeAlvo, statusTexto } = req.body;
     if (!cookies) return res.status(400).json({ erro: 'Cookies não informados.' });
 
     const key = getCookieKey(cookies);
@@ -482,57 +481,120 @@ app.post('/api/pdf-clone', async (req, res) => {
         const browser = await getBrowser();
         const page = await browser.newPage();
 
-        const cookieArray = cookies.split('; ').map((c) => {
-            const eq = c.indexOf('=');
-            const name = c.slice(0, eq).trim();
-            const value = c.slice(eq + 1);
-            return { name, value, domain: 'indisponibilidade.onr.org.br', path: '/' };
-        }).filter(c => c.name);
-
-        await page.setCookie(...cookieArray);
-        await page.goto('https://indisponibilidade.onr.org.br/ordem/consulta/simplificada', { waitUntil: 'networkidle2', timeout: 30000 });
-
+        // Formatar documento
         const docRaw = documento.replace(/\D/g, '');
-        let inputHandle = null;
-
-        const seletores = [
-            'input[maxlength="14"]', 'input[maxlength="18"]',
-            'input[placeholder*="CPF"]', 'input[placeholder*="CNPJ"]',
-            'input[type="text"]:not([readonly]):not([disabled])',
-        ];
-
-        for (const sel of seletores) {
-            try {
-                inputHandle = await page.waitForSelector(sel, { timeout: 3000, visible: true });
-                if (inputHandle) break;
-            } catch {}
+        let docFormatted = docRaw;
+        if (docRaw.length === 11) {
+            docFormatted = docRaw.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        } else if (docRaw.length === 14) {
+            docFormatted = docRaw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3.$4-$5');
         }
 
-        if (!inputHandle) throw new Error('Campo de documento não encontrado');
+        // Escape HTML
+        const h = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-        await inputHandle.click({ clickCount: 3 });
-        await inputHandle.type(docRaw, { delay: 40 });
-        await inputHandle.evaluate(el => el.dispatchEvent(new Event('blur', { bubbles: true })));
-        await new Promise(r => setTimeout(r, 600));
+        // Dados padrão
+        const ordersArray = orders || [];
+        const isNeg = ordersArray.length === 0;
+        const status = statusTexto || (isNeg ? 'NEGATIVO' : 'POSITIVO');
+        const dataHora = new Date().toLocaleString('pt-BR');
+        const hash = 'vzkkait5zq';
+        const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://indisponibilidade.onr.org.br/home/validar';
 
-        await page.evaluate(() => {
-            const btns = [...document.querySelectorAll('button, input[type="submit"]')];
-            const btn = btns.find(b => b.offsetParent !== null && (b.textContent.match(/pesquis|buscar|consultar/i) || b.type === 'submit'));
-            if (btn) btn.click();
-            else document.querySelector('input')?.press('Enter');
-        });
+        // HTML dos resultados
+        let htmlRes = '';
+        if (isNeg) {
+            htmlRes = '<div class="result-container"><div class="result-text-neg">NÃO FORAM ENCONTRADA(S) INDISPONIBILIDADE(S) GENÉRICA(S) E<br>ESPECÍFICA(S) PARA O DOCUMENTO PESQUISADO</div></div>';
+        } else {
+            htmlRes = '<div class="result-text-pos">Constam no cadastro da CNIB, as seguintes ocorrências:</div><div class="items-list">';
+            ordersArray.forEach(o => {
+                htmlRes += '<div class="item-box">' +
+                    '<div class="item-line"><span class="item-label">PROTOCOLO:</span> ' + h(o.protocol || '—') + '</div>' +
+                    '<div class="item-line"><span class="item-label">NÚMERO DO PROCESSO:</span> ' + h(o.processNumber || '—') + '</div>' +
+                    '<div class="item-line"><span class="item-label">TIPO:</span> ' + h(o.processName || '—') + '</div>' +
+                    '<div class="item-line"><span class="item-label">EMISSOR DA ORDEM:</span> ' + h(o.organizationLabel || '—') + '</div>' +
+                    '</div>';
+            });
+            htmlRes += '</div>';
+        }
 
-        await Promise.race([
-            page.waitForFunction(() => !document.querySelector("[class*='loading'],[class*='spinner']"), { timeout: 15000 }),
-            new Promise(r => setTimeout(r, 8000)),
-        ]).catch(() => {});
+        const css = `
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: Arial, sans-serif; color: #000; font-size: 9.5pt; line-height: 1.3; background: #fff; }
+            @page { margin: 15mm 20mm; size: A4; }
+            .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid #000; margin-bottom: 25px; }
+            .logo { max-width: 150px; height: auto; }
+            .main-title { font-size: 16pt; font-weight: bold; margin-bottom: 25px; }
+            .sec-header { font-size: 13pt; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 15px; }
+            .dados-grid { display: flex; margin-bottom: 25px; gap: 40px; }
+            .dados-col { flex: 1; }
+            .dados-label { font-size: 8pt; font-weight: bold; text-transform: uppercase; margin-bottom: 3px; }
+            .dados-val { font-size: 10pt; text-transform: uppercase; }
+            .res-label { font-size: 13pt; font-weight: bold; margin-bottom: 20px; }
+            .result-container { margin-bottom: 35px; }
+            .result-text-neg { font-weight: bold; font-size: 11pt; }
+            .result-text-pos { margin-bottom: 20px; font-size: 10pt; }
+            .item-box { margin-bottom: 25px; page-break-inside: avoid; }
+            .item-line { margin-bottom: 4px; font-size: 9.5pt; text-transform: uppercase; }
+            .item-label { font-weight: bold; }
+            .legal-text { font-size: 9pt; text-align: justify; margin-bottom: 10px; }
+            .validation-box { border: 1px solid #a0a0a0; padding: 15px; margin-top: 30px; display: flex; align-items: center; page-break-inside: avoid; }
+            .qr-wrapper { border-right: 1px solid #a0a0a0; padding-right: 20px; margin-right: 20px; }
+            .qr-code { width: 80px; height: 80px; display: block; }
+            .val-info { flex: 1; text-align: center; }
+            .val-title { font-weight: bold; font-size: 8.5pt; margin-bottom: 10px; }
+            .hash-label { font-size: 8pt; margin-bottom: 2px; }
+            .hash-val { font-weight: bold; font-size: 11pt; margin-bottom: 10px; }
+            .footer-table { width: 100%; border: 1px solid #a0a0a0; margin-top: 15px; border-collapse: collapse; page-break-inside: avoid; }
+            .footer-table td { padding: 10px; font-size: 8pt; border-right: 1px solid #a0a0a0; border-bottom: 1px solid #a0a0a0; }
+            .footer-table td:last-child { border-right: none; }
+            .ft-label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 7.5pt; }
+            .page-footer { display: flex; justify-content: space-between; margin-top: 40px; font-size: 7.5pt; border-top: 1px solid #ccc; padding-top: 10px; }
+        `;
 
-        // Gera PDF via Puppeteer HTML simples
-        const docMascarado = docRaw.replace(/(\d{3})(\d{5})/, '$1.-**');
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório CNIB</title>
+    <style>${css}</style>
+</head>
+<body>
+    <div class="header">
+        <img src="https://indisponibilidade.onr.org.br/assets/img/CNIB-EXTENSO-AZUL.png" class="logo" onerror="this.style.display='none'">
+        <img src="https://indisponibilidade.onr.org.br/assets/img/logo-onr-novo.png" class="logo" onerror="this.style.display='none'">
+    </div>
+    <div class="main-title">Relatório de Consulta de Indisponibilidade de Bens</div>
+    <div class="sec-header">Dados Pesquisados</div>
+    <div class="dados-grid">
+        <div class="dados-col"><div class="dados-label">CPF</div><div class="dados-val">${h(docFormatted)}</div></div>
+        <div class="dados-col"><div class="dados-label">NOME</div><div class="dados-val">${h(nomeAlvo || 'DESCONHECIDO')}</div></div>
+    </div>
+    <div class="res-label">Resultado: ${h(status)}</div>
+    ${htmlRes}
+    <div class="sec-header">Informações Importantes</div>
+    <div class="legal-text">Este Relatório foi emitido pela Central Nacional de Indisponibilidade de Bens (CNIB), com base nos artigos 7º e 9º do Provimento CNJ nº 39/2014, de 25/7/2014, da Corregedoria Nacional de Justiça do Conselho Nacional de Justiça (CNJ).</div>
+    <div class="legal-text">A informação negativa não significa inexistência de indisponibilidades anteriormente decretadas, assim como eventuais indisponibilidades relacionadas referem-se apenas às ordens que foram cadastradas a partir das referidas datas.</div>
+    <div class="validation-box">
+        <div class="qr-wrapper"><img src="${qrUrl}" class="qr-code" onerror="this.style.display='none'"></div>
+        <div class="val-info"><div class="val-title">Validar autenticidade</div><div class="hash-label">Hash:</div><div class="hash-val">${h(hash)}</div></div>
+    </div>
+    <table class="footer-table"><tr>
+        <td width="30%"><span class="ft-label">Emitido em:</span>${h(dataHora)}</td>
+        <td width="40%"><span class="ft-label">Responsável pela Consulta:</span>${h(responsavelNome || 'DESCONHECIDO')}</td>
+        <td width="30%"><span class="ft-label">CPF do Responsável:</span>${h(responsavelCPF || '—')}</td>
+    </tr></table>
+    <div class="page-footer"><div>Data e Hora deste Relatório: ${h(dataHora)}<br>https://indisponibilidade.org.br</div></div>
+</body>
+</html>`;
+
+        // Gera PDF via Puppeteer
+        await page.setContent(html, { waitUntil: 'networkidle0' });
         const pdfBuffer = await page.pdf({
             format: 'A4',
-            margin: { top: 20, right: 20, bottom: 20, left: 20 },
+            margin: { top: '15mm', right: '20mm', bottom: '20mm', left: '20mm' },
             printBackground: true,
+            displayHeaderFooter: false,
         });
 
         await page.close();

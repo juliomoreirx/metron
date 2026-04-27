@@ -1075,14 +1075,25 @@ async function mlRun() {
           // Oficial falhou — tenta Clone como fallback
           usedFallback = true;
           try {
+            const responsavelNome = (data.hashResult?.personName || '').toUpperCase() || 'DESCONHECIDO';
+            let responsavelCPF = (data.hashResult?.documentNumber || '').replace(/\D/g,'');
+            if (responsavelCPF.length === 11) {
+              const primeiros3 = responsavelCPF.substring(0, 3);
+              const ultimos2 = responsavelCPF.substring(9, 11);
+              responsavelCPF = `${primeiros3}.***.***.***-${ultimos2}`;
+            }
+            
             const cloneRes = await fetch('/api/pdf-clone', {
               method:'POST',
               headers:{'Content-Type':'application/json'},
               body: JSON.stringify({
                 cookies,
                 documento: item.raw,
-                responsavelNome: (data.hashResult?.personName || '').toUpperCase() || 'DESCONHECIDO',
-                responsavelCPF: (data.hashResult?.documentNumber || '').replace(/\D/g,'').substring(0,6) + '.-**'
+                responsavelNome,
+                responsavelCPF,
+                orders,
+                nomeAlvo: nomeAPI,
+                statusTexto: resultado
               })
             });
             if (cloneRes.status === 401) throw new Error('SESSION_EXPIRED');
@@ -1091,7 +1102,7 @@ async function mlRun() {
             }
           } catch (cloneErr) {
             if (cloneErr.message === 'SESSION_EXPIRED') throw cloneErr;
-            // Clone também falhou — deixa pdfBlob null
+            // Clone também falhou
           }
         }
 
