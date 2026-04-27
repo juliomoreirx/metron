@@ -964,8 +964,8 @@ async function generateClonePDF(data, rawDoc, pedido, feitoPor) {
   const bodyParts = [
     '<html><head><title>Relat\u00f3rio CNIB</title><style>' + css + '</style></head><body>',
     '<div class="header">',
-    '<img src="/assets/CNIB-EXTENSO-AZUL.png" class="logo-cnib" onerror="this.style.display=\'none\'">',
-    '<img src="/assets/logo-onr-novo.png" class="logo-onr" onerror="this.style.display=\'none\'">',
+    '<img src="./assets/CNIB-EXTENSO-AZUL.png" class="logo-cnib" onerror="this.style.display=\'none\'">',
+    '<img src="./assets/logo-onr-novo.png" class="logo-onr" onerror="this.style.display=\'none\'">',
     '</div>',
     '<div class="main-title">Relat\u00f3rio de Consulta de Indisponibilidade de Bens</div>',
     '<div class="sec-header">Dados Pesquisados</div>',
@@ -1020,11 +1020,10 @@ async function generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename)
   const responsavelNome = (data.hashResult?.personName || '').toUpperCase() || 'DESCONHECIDO';
   let responsavelCPF = (data.hashResult?.documentNumber || '').replace(/\D/g,'');
   
-  // Máscara o CPF do responsável corretamente: 179.***.***.***-**
+  // Máscara o CPF do responsável corretamente: 179.***.***-**
   if (responsavelCPF.length === 11) {
     const primeiros3 = responsavelCPF.substring(0, 3);
-    const ultimos2 = responsavelCPF.substring(9, 11);
-    responsavelCPF = `${primeiros3}.***.***.***-${ultimos2}`;
+    responsavelCPF = `${primeiros3}.***.***-**`;
   } else if (responsavelCPF.length > 0) {
     responsavelCPF = responsavelCPF.substring(0, 3) + '.-**';
   } else {

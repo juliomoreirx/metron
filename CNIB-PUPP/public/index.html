@@ -1079,8 +1079,7 @@ async function mlRun() {
             let responsavelCPF = (data.hashResult?.documentNumber || '').replace(/\D/g,'');
             if (responsavelCPF.length === 11) {
               const primeiros3 = responsavelCPF.substring(0, 3);
-              const ultimos2 = responsavelCPF.substring(9, 11);
-              responsavelCPF = `${primeiros3}.***.***.***-${ultimos2}`;
+              responsavelCPF = `${primeiros3}.***.***-**`;
             }
             
             const cloneRes = await fetch('/api/pdf-clone', {
