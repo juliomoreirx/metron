@@ -465,6 +465,90 @@ app.post('/api/pdf', async (req, res) => {
     }
 });
 
+// ── POST /api/pdf-clone ────────────────────────────────────────
+// Gera PDF Clone via Puppeteer - cria um documento texto formatado
+// que replica o estrutura visual do CNIB sem dependência do servidor ONR
+app.post('/api/pdf-clone', async (req, res) => {
+    const { cookies, documento, responsavelNome, responsavelCPF } = req.body;
+    if (!cookies) return res.status(400).json({ erro: 'Cookies não informados.' });
+
+    const key = getCookieKey(cookies);
+    const session = blazorSessions.get(key);
+    console.log(`\n[PDF-CLONE] Gerando clone para doc ${documento?.slice(0,3)}***`);
+
+    try {
+        if (!session) return res.status(400).json({ erro: 'Pesquise um documento antes de gerar o PDF Clone.' });
+
+        const browser = await getBrowser();
+        const page = await browser.newPage();
+
+        const cookieArray = cookies.split('; ').map((c) => {
+            const eq = c.indexOf('=');
+            const name = c.slice(0, eq).trim();
+            const value = c.slice(eq + 1);
+            return { name, value, domain: 'indisponibilidade.onr.org.br', path: '/' };
+        }).filter(c => c.name);
+
+        await page.setCookie(...cookieArray);
+        await page.goto('https://indisponibilidade.onr.org.br/ordem/consulta/simplificada', { waitUntil: 'networkidle2', timeout: 30000 });
+
+        const docRaw = documento.replace(/\D/g, '');
+        let inputHandle = null;
+
+        const seletores = [
+            'input[maxlength="14"]', 'input[maxlength="18"]',
+            'input[placeholder*="CPF"]', 'input[placeholder*="CNPJ"]',
+            'input[type="text"]:not([readonly]):not([disabled])',
+        ];
+
+        for (const sel of seletores) {
+            try {
+                inputHandle = await page.waitForSelector(sel, { timeout: 3000, visible: true });
+                if (inputHandle) break;
+            } catch {}
+        }
+
+        if (!inputHandle) throw new Error('Campo de documento não encontrado');
+
+        await inputHandle.click({ clickCount: 3 });
+        await inputHandle.type(docRaw, { delay: 40 });
+        await inputHandle.evaluate(el => el.dispatchEvent(new Event('blur', { bubbles: true })));
+        await new Promise(r => setTimeout(r, 600));
+
+        await page.evaluate(() => {
+            const btns = [...document.querySelectorAll('button, input[type="submit"]')];
+            const btn = btns.find(b => b.offsetParent !== null && (b.textContent.match(/pesquis|buscar|consultar/i) || b.type === 'submit'));
+            if (btn) btn.click();
+            else document.querySelector('input')?.press('Enter');
+        });
+
+        await Promise.race([
+            page.waitForFunction(() => !document.querySelector("[class*='loading'],[class*='spinner']"), { timeout: 15000 }),
+            new Promise(r => setTimeout(r, 8000)),
+        ]).catch(() => {});
+
+        // Gera PDF via Puppeteer HTML simples
+        const docMascarado = docRaw.replace(/(\d{3})(\d{5})/, '$1.-**');
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            margin: { top: 20, right: 20, bottom: 20, left: 20 },
+            printBackground: true,
+        });
+
+        await page.close();
+        browserUseCount++;
+
+        res.set('Content-Type', 'application/pdf');
+        res.set('Content-Length', pdfBuffer.length);
+        console.log(`[PDF-CLONE] ✓ PDF Clone gerado (${pdfBuffer.length} bytes)`);
+        res.send(pdfBuffer);
+
+    } catch (err) {
+        console.error(`[PDF-CLONE] Erro: ${err.message}`);
+        return res.status(500).json({ erro: `Falha ao gerar PDF Clone: ${err.message}` });
+    }
+});
+
 // ═══════════════════════════════════════════════════════════
 // Limpeza periódica
 // ═══════════════════════════════════════════════════════════

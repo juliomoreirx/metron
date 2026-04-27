@@ -1006,6 +1006,57 @@ async function generateClonePDF(data, rawDoc, pedido, feitoPor) {
   return win;
 }
 
+// ── FEATURE 5: GERAR PDF CLONE E SALVAR DIRETO (sem print dialog) ──
+async function generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename) {
+  const cookies = localStorage.getItem('onr_cookies');
+  if (!cookies) { sessaoExpirada(); return; }
+
+  const documento = (data.person?.documentNumber || rawDoc || '').replace(/\D/g,'');
+  
+  // Responsável vem do token ONR (hashResult)
+  const responsavelNome = (data.hashResult?.personName || '').toUpperCase() || 'DESCONHECIDO';
+  let responsavelCPF = (data.hashResult?.documentNumber || '').replace(/\D/g,'');
+  // Máscara o CPF do responsável: 000..-**
+  if (responsavelCPF.length === 11) {
+    responsavelCPF = responsavelCPF.substring(0, 6) + '.-**';
+  } else if (responsavelCPF.length > 0) {
+    responsavelCPF = responsavelCPF.substring(0, Math.min(6, responsavelCPF.length)) + '.-**';
+  } else {
+    responsavelCPF = '—';
+  }
+
+  try {
+    // Chama endpoint /api/pdf-clone no servidor
+    const res = await fetch('/api/pdf-clone', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        cookies,
+        documento,
+        responsavelNome,
+        responsavelCPF
+      })
+    });
+
+    if (res.status === 401) {
+      sessaoExpirada();
+      return;
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({erro:'Erro desconhecido'}));
+      showMsg('msg-pesquisa', err.erro || 'Erro ao gerar PDF Clone.', 'error');
+      return;
+    }
+
+    const blob = await res.blob();
+    await savePDFBlob(blob, filename, 'PDF Clone gerado com sucesso');
+  } catch (err) {
+    console.error('Erro ao gerar PDF Clone:', err);
+    showMsg('msg-pesquisa', 'Erro ao gerar PDF Clone. Tente novamente.', 'error');
+  }
+}
+
 // ── AUTH ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   purgeExpiredHistory();
@@ -1525,73 +1576,107 @@ async function downloadPDF() {
   if (STATE.pdfMode === 'clone') {
     btn.classList.add('loading'); btn.disabled = true;
     try {
-      await generateClonePDF(data, rawDoc, pedido, feitoPor);
+      await generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename);
     } finally {
       btn.classList.remove('loading'); btn.disabled = false;
     }
     return;
   }
 
-  // ── MODO OFICIAL ────────────────────────────────────────
+  // ── MODO OFICIAL COM TIMEOUT 7s + FALLBACK PARA CLONE ──
   btn.classList.add('loading'); btn.disabled = true;
+  const indicator = document.getElementById('pdf-indicator');
 
   try {
-    const res = await fetch('/api/pdf', {
+    // Estratégia: Promise.race entre fetch do PDF oficial (7s) e fallback
+    const oficialPromise = fetch('/api/pdf', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({cookies})
+    }).then(async res => {
+      if (res.status === 401) {
+        sessaoExpirada();
+        throw new Error('SESSION_EXPIRED');
+      }
+      if (!res.ok) throw new Error('HTTP_' + res.status);
+      return await res.blob();
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({erro:'Erro desconhecido'}));
-      showMsg('msg-pesquisa', err.erro || 'Erro ao gerar PDF.', 'error');
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT_7S')), 7000)
+    );
+
+    try {
+      // Tenta Oficial dentro de 7s
+      const blob = await Promise.race([oficialPromise, timeoutPromise]);
+      
+      // Sucesso — salva/baixa o PDF
+      if (indicator) {
+        indicator.classList.add('done');
+        indicator.querySelector('.pi-spin').style.display='none';
+        const t = indicator.querySelector('#pdf-indicator-text');
+        if (t) t.textContent = 'Gerando Certidão...';
+      }
+      
+      await savePDFBlob(blob, filename, 'Certidão PDF salvo');
+    } catch (timeoutErr) {
+      // Oficial falhou ou demorou — tenta Clone como fallback
+      if (timeoutErr.message === 'SESSION_EXPIRED') throw timeoutErr;
+      
+      if (indicator) {
+        indicator.classList.add('done');
+        indicator.querySelector('.pi-spin').style.display='none';
+        const t = indicator.querySelector('#pdf-indicator-text');
+        if (t) t.textContent = 'PDF Oficial indisponível, gerando Clone...';
+      }
+      
+      await generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename);
+    }
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') {
+      setTimeout(sessaoExpirada, 100);
       return;
     }
-
-    const blob = await res.blob();
-
-    // ── Feature 1: salva direto na pasta se definida ─────
-    if (STATE.singleFolderHandle) {
-      try {
-        const fileHandle = await STATE.singleFolderHandle.getFileHandle(filename, {create:true});
-        const writable   = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        // Também copia o nome para clipboard
-        try { await navigator.clipboard.writeText(filename); } catch {}
-        const indicator = document.getElementById('pdf-indicator');
-        if (indicator) {
-          indicator.classList.add('done');
-          indicator.querySelector('.pi-spin').style.display='none';
-          const t = indicator.querySelector('#pdf-indicator-text');
-          if (t) t.textContent = `Salvo em "${STATE.singleFolderHandle.name}"`;
-        }
-        return;
-      } catch {
-        // Falhou ao salvar na pasta — cai no download normal
-      }
-    }
-
-    // Download normal pelo navegador
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    try { await navigator.clipboard.writeText(filename); } catch {}
-
-    const indicator = document.getElementById('pdf-indicator');
-    if (indicator) {
-      indicator.classList.add('done');
-      indicator.querySelector('.pi-spin').style.display='none';
-      const t = indicator.querySelector('#pdf-indicator-text');
-      if (t) t.textContent = 'PDF baixado com sucesso';
-    }
-  } catch {
-    showMsg('msg-pesquisa','Erro ao baixar PDF. Tente novamente.','error');
+    showMsg('msg-pesquisa','Erro ao gerar PDF. Tente novamente.','error');
   } finally {
     btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
+
+// ── SALVAR BLOB DE PDF ──────────────────────────────────────
+async function savePDFBlob(blob, filename, successMsg='PDF salvo') {
+  // Feature: salva direto na pasta se definida
+  if (STATE.singleFolderHandle) {
+    try {
+      const fileHandle = await STATE.singleFolderHandle.getFileHandle(filename, {create:true});
+      const writable   = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      try { await navigator.clipboard.writeText(filename); } catch {}
+      const indicator = document.getElementById('pdf-indicator');
+      if (indicator) {
+        const t = indicator.querySelector('#pdf-indicator-text');
+        if (t) t.textContent = `${successMsg} em "${STATE.singleFolderHandle.name}"`;
+      }
+      return;
+    } catch {
+      // Falhou ao salvar na pasta — cai no download normal
+    }
+  }
+
+  // Download normal pelo navegador
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  try { await navigator.clipboard.writeText(filename); } catch {}
+
+  const indicator = document.getElementById('pdf-indicator');
+  if (indicator) {
+    const t = indicator.querySelector('#pdf-indicator-text');
+    if (t) t.textContent = successMsg;
   }
 }
 

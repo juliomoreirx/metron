@@ -1028,33 +1028,88 @@ async function mlRun() {
           statusEl.innerHTML = '<span class="qs-spin"></span>Gerando PDF...';
         }
 
-        // Polling no status até ficar ready (max 35s)
-        let pdfReady = false;
-        for (let t=0; t<35; t++) {
-          await delay(1000);
-          const sr = await fetch('/api/pdf/status', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cookies}) });
-          const sd = await sr.json();
-          if (sd.status==='ready') { pdfReady=true; break; }
-          if (sd.status==='error') break;
+        // ── MODO: Tenta Oficial 7s, depois fallback para Clone ──
+        const nomeFile  = nomeAPI.toUpperCase().replace(/[^A-Z0-9\s]/g,'').trim();
+        const docFile   = docForFilename(item.raw);
+        const filename  = `${item.pedido} - ${resultado} - ${nomeFile} - ${docFile} - Feito por ${feitoPor}.pdf`;
+
+        let pdfBlob = null;
+        let usedFallback = false;
+
+        // Estratégia 1: Tenta Oficial com polling 7s
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('TIMEOUT_7S')), 7000)
+          );
+
+          const oficialPromise = (async () => {
+            for (let t=0; t<35; t++) {
+              await delay(1000);
+              const sr = await fetch('/api/pdf/status', { 
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({cookies}) 
+              });
+              if (sr.status === 401) throw new Error('SESSION_EXPIRED');
+              const sd = await sr.json();
+              if (sd.status==='ready') return 'ready';
+              if (sd.status==='error') return 'error';
+            }
+            return 'timeout';
+          })();
+
+          const result = await Promise.race([timeoutPromise, oficialPromise]);
+          if (result === 'ready') {
+            const pdfRes = await fetch('/api/pdf', { 
+              method:'POST', 
+              headers:{'Content-Type':'application/json'}, 
+              body:JSON.stringify({cookies}) 
+            });
+            if (pdfRes.status === 401) throw new Error('SESSION_EXPIRED');
+            if (pdfRes.ok) {
+              pdfBlob = await pdfRes.blob();
+            }
+          }
+        } catch (timeoutErr) {
+          if (timeoutErr.message === 'SESSION_EXPIRED') throw timeoutErr;
+          // Oficial falhou — tenta Clone como fallback
+          usedFallback = true;
+          try {
+            const cloneRes = await fetch('/api/pdf-clone', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({
+                cookies,
+                documento: item.raw,
+                responsavelNome: (data.hashResult?.personName || '').toUpperCase() || 'DESCONHECIDO',
+                responsavelCPF: (data.hashResult?.documentNumber || '').replace(/\D/g,'').substring(0,6) + '.-**'
+              })
+            });
+            if (cloneRes.status === 401) throw new Error('SESSION_EXPIRED');
+            if (cloneRes.ok) {
+              pdfBlob = await cloneRes.blob();
+            }
+          } catch (cloneErr) {
+            if (cloneErr.message === 'SESSION_EXPIRED') throw cloneErr;
+            // Clone também falhou — deixa pdfBlob null
+          }
         }
 
-        if (pdfReady) {
-          const pdfRes = await fetch('/api/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cookies}) });
-          if (pdfRes.ok) {
-            const pdfBlob   = await pdfRes.blob();
-            const nomeFile  = nomeAPI.toUpperCase().replace(/[^A-Z0-9\s]/g,'').trim();
-            const docFile   = docForFilename(item.raw);
-            const filename  = `${item.pedido} - ${resultado} - ${nomeFile} - ${docFile} - Feito por ${feitoPor}.pdf`;
-            const fileHandle = await STATE.selectedFolderHandle.getFileHandle(filename, {create:true});
-            const writable   = await fileHandle.createWritable();
-            await writable.write(pdfBlob);
-            await writable.close();
-          }
+        // Salva o PDF (se conseguiu, seja Oficial ou Clone)
+        if (pdfBlob) {
+          const fileHandle = await STATE.selectedFolderHandle.getFileHandle(filename, {create:true});
+          const writable   = await fileHandle.createWritable();
+          await writable.write(pdfBlob);
+          await writable.close();
         }
 
         // Restaura badge de resultado após PDF (com ou sem sucesso)
         if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
-      } catch {
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') {
+          setTimeout(() => { localStorage.removeItem('onr_cookies'); location.reload(); }, 100);
+          throw err;
+        }
         // PDF falhou — restaura badge de resultado mesmo assim
         if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
       }
