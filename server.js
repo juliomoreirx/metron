@@ -500,6 +500,11 @@ app.post('/api/pdf-clone', async (req, res) => {
         const dataHora = new Date().toLocaleString('pt-BR');
         const hash = 'vzkkait5zq';
         const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://indisponibilidade.onr.org.br/home/validar';
+        
+        // Caminhos das imagens locais
+        const assetsDir = path.join(__dirname, 'public', 'assets');
+        const imgCnib = 'file://' + assetsDir.replace(/\\/g, '/') + '/CNIB-EXTENSO-AZUL.png';
+        const imgOnr = 'file://' + assetsDir.replace(/\\/g, '/') + '/logo-onr-novo.png';
 
         // HTML dos resultados
         let htmlRes = '';
@@ -561,8 +566,8 @@ app.post('/api/pdf-clone', async (req, res) => {
 </head>
 <body>
     <div class="header">
-        <img src="https://indisponibilidade.onr.org.br/assets/img/CNIB-EXTENSO-AZUL.png" class="logo" onerror="this.style.display='none'">
-        <img src="https://indisponibilidade.onr.org.br/assets/img/logo-onr-novo.png" class="logo" onerror="this.style.display='none'">
+        <img src="${imgCnib}" class="logo" onerror="this.style.display='none'">
+        <img src="${imgOnr}" class="logo" onerror="this.style.display='none'">
     </div>
     <div class="main-title">Relatório de Consulta de Indisponibilidade de Bens</div>
     <div class="sec-header">Dados Pesquisados</div>
