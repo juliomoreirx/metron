@@ -1653,12 +1653,13 @@ async function downloadPDF() {
     return;
   }
 
-  // ── MODO OFICIAL COM TIMEOUT 7s + FALLBACK PARA CLONE ──
+  // ── MODO OFICIAL COM TIMEOUT DINÂMICO + FALLBACK PARA CLONE ──
   btn.classList.add('loading'); btn.disabled = true;
   const indicator = document.getElementById('pdf-indicator');
+  const timeoutMs = orders.length > 10 ? 15000 : 7000;
 
   try {
-    // Estratégia: Promise.race entre fetch do PDF oficial (7s) e fallback
+    // Estratégia: Promise.race entre fetch do PDF oficial e fallback
     const oficialPromise = fetch('/api/pdf', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({cookies})
@@ -1672,11 +1673,11 @@ async function downloadPDF() {
     });
 
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('TIMEOUT_7S')), 7000)
+      setTimeout(() => reject(new Error(`TIMEOUT_${timeoutMs}MS`)), timeoutMs)
     );
 
     try {
-      // Tenta Oficial dentro de 7s
+      // Tenta Oficial dentro do timeout dinâmico
       const blob = await Promise.race([oficialPromise, timeoutPromise]);
       
       // Sucesso — salva/baixa o PDF
