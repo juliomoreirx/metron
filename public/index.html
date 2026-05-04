@@ -100,16 +100,11 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .doc-hint{font-size:11px;color:var(--red);display:none;margin-top:2px;}
 .doc-hint.show{display:block;}
 
-/* ── FORM ROW — campos lado a lado na mesma linha de base ── */
-.form-row{
-  display:flex;
-  gap:12px;
-  align-items:flex-end; /* alinha pelo bottom de cada field */
-  margin-bottom:16px;
-}
-.form-row .field{flex:1;margin:0;}           /* cada field ocupa espaço igual */
-.form-row .field.narrow{flex:0 0 160px;}     /* campo estreito fixo */
-.form-row .field.wide{flex:2;}               /* campo mais largo */
+/* FORM ROW */
+.form-row{display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;}
+.form-row .field{flex:1;margin:0;}
+.form-row .field.narrow{flex:0 0 160px;}
+.form-row .field.wide{flex:2;}
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;cursor:pointer;border:none;transition:all .25s var(--trans);position:relative;overflow:hidden;}
@@ -143,12 +138,7 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .status-msg.info{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(91,156,246,.2);}
 
 /* PDF INDICATOR */
-.pdf-indicator{
-  display:none;align-items:center;gap:8px;
-  font-size:11.5px;color:var(--amber);
-  background:var(--amber-glow);border:1px solid rgba(212,168,75,.2);
-  padding:6px 12px;border-radius:var(--radius-xs);margin-top:6px;
-}
+.pdf-indicator{display:none;align-items:center;gap:8px;font-size:11.5px;color:var(--amber);background:var(--amber-glow);border:1px solid rgba(212,168,75,.2);padding:6px 12px;border-radius:var(--radius-xs);margin-top:6px;}
 .pdf-indicator.show{display:flex;}
 .pdf-indicator .pi-spin{width:11px;height:11px;border:1.5px solid rgba(212,168,75,.3);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
 .pdf-indicator.done{color:var(--green);background:var(--green-dim);border-color:rgba(61,214,140,.2);}
@@ -186,24 +176,36 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .btn-pdf.loading svg.pdf-icon{display:none;}
 .btn-pdf.loading .pdf-spin{display:block;}
 
-/* ORDERS GRID */
-.orders-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-height:58vh;overflow-y:auto;padding-right:4px;align-items:start;}
+/* ORDERS LIST — FIX #4: full-width rows instead of grid */
+.orders-list{display:flex;flex-direction:column;gap:10px;max-height:65vh;overflow-y:auto;padding-right:4px;}
+.orders-list::-webkit-scrollbar{width:5px;}
+.orders-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
+
+/* ORDERS GRID — kept for grouped mode only (legacy) */
+.orders-grid{display:flex;flex-direction:column;gap:10px;max-height:65vh;overflow-y:auto;padding-right:4px;}
 .orders-grid::-webkit-scrollbar{width:5px;}
 .orders-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
-@media(max-width:900px){.orders-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:560px){.orders-grid{grid-template-columns:1fr;}}
-.order-card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .25s,transform .25s var(--trans),box-shadow .25s;display:flex;flex-direction:column;}
-.order-card:hover{border-color:var(--border-h);transform:translateY(-2px);box-shadow:var(--shadow);}
-.order-card-top{padding:10px 12px 8px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-shrink:0;}
+
+/* ORDER CARD — full width row layout */
+.order-card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .25s,box-shadow .25s;width:100%;}
+.order-card:hover{border-color:var(--border-h);box-shadow:var(--shadow-sm);}
+.order-card-top{padding:10px 16px 9px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;}
 [data-theme="light"] .order-card-top{background:rgba(0,0,0,.04);}
 .protocol-lbl{font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:2px;}
-.protocol-val{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);word-break:break-all;line-height:1.4;}
+.protocol-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--text);word-break:break-all;line-height:1.4;}
 .date-lbl{font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);text-align:right;margin-bottom:2px;}
 .date-val{font-size:10.5px;color:var(--text-2);text-align:right;white-space:nowrap;}
-.order-card-body{padding:10px 12px;display:flex;flex-direction:column;gap:7px;flex:1;}
-.ofield-lbl{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:1px;}
-.ofield-val{font-size:11.5px;color:var(--text);line-height:1.5;word-break:break-word;}
-.group-header-row{grid-column:1/-1;padding-top:8px;}
+
+/* ORDER CARD BODY — horizontal layout for wide cards */
+.order-card-body{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 20px;}
+@media(max-width:700px){.order-card-body{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.order-card-body{grid-template-columns:1fr;}}
+.ofield-lbl{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:3px;}
+.ofield-val{font-size:12px;color:var(--text);line-height:1.5;word-break:break-word;}
+/* Emissor da ordem gets full width since it's usually very long */
+.ofield-emissor{grid-column:1/-1;}
+
+.group-header-row{padding-top:8px;}
 .group-label{width:100%;padding:8px 0 4px;font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--border);margin-bottom:4px;display:flex;align-items:center;gap:8px;}
 .group-count{font-size:10px;padding:2px 7px;border-radius:100px;background:var(--amber-glow);color:var(--amber);border:1px solid rgba(212,168,75,.25);}
 
@@ -282,15 +284,14 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:20px;}
 .modal-overlay.show{display:flex;animation:fadeIn .2s both;}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:860px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);animation:slideUp .3s var(--trans) both;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);animation:slideUp .3s var(--trans) both;}
 .modal-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .modal-title{font-family:'DM Serif Display',serif;font-size:18px;color:var(--text);}
 .modal-body{overflow-y:auto;flex:1;padding:22px;}
 .modal-body::-webkit-scrollbar{width:5px;}
 .modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;}
-.modal-orders-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px;align-items:start;}
-@media(max-width:700px){.modal-orders-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:420px){.modal-orders-grid{grid-column:1fr;}}
+/* Modal orders use same full-width list layout */
+.modal-orders-list{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
 
 /* MISC */
 .divider{height:1px;background:var(--border);width:100%;margin:4px 0;}
@@ -306,148 +307,62 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .stagger>*{animation:fadeUp .45s var(--trans) both;}
 .stagger>*:nth-child(1){animation-delay:0ms}.stagger>*:nth-child(2){animation-delay:50ms}.stagger>*:nth-child(3){animation-delay:100ms}.stagger>*:nth-child(4){animation-delay:150ms}.stagger>*:nth-child(5){animation-delay:200ms}.stagger>*:nth-child(6){animation-delay:250ms}.stagger>*:nth-child(7){animation-delay:300ms}.stagger>*:nth-child(8){animation-delay:350ms}
+
 /* AUTH DIVIDER */
-.auth-divider{
-  display:flex;align-items:center;gap:12px;
-  margin:20px 0 16px;color:var(--text-3);font-size:12px;
-}
-.auth-divider::before,.auth-divider::after{
-  content:'';flex:1;height:1px;background:var(--border);
-}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0 16px;color:var(--text-3);font-size:12px;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
 
 /* PUBLISHER CARD */
-.publisher-card{
-  background:var(--card-bg);border:1px solid var(--border);
-  border-radius:var(--radius-sm);padding:14px;
-  transition:border-color .25s;
-}
+.publisher-card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;transition:border-color .25s;}
 .publisher-card:hover{border-color:var(--border-h);}
 .publisher-header{display:flex;align-items:center;justify-content:space-between;}
-.publisher-icon{
-  width:32px;height:32px;border-radius:8px;
-  background:var(--amber-glow);border:1px solid rgba(212,168,75,.2);
-  display:grid;place-items:center;color:var(--amber);flex-shrink:0;
-}
-.publisher-status-dot{
-  width:10px;height:10px;border-radius:50%;
-  background:var(--text-3);flex-shrink:0;transition:background .3s;
-}
+.publisher-icon{width:32px;height:32px;border-radius:8px;background:var(--amber-glow);border:1px solid rgba(212,168,75,.2);display:grid;place-items:center;color:var(--amber);flex-shrink:0;}
+.publisher-status-dot{width:10px;height:10px;border-radius:50%;background:var(--text-3);flex-shrink:0;transition:background .3s;}
 .publisher-status-dot.online{background:var(--green);box-shadow:0 0 6px rgba(61,214,140,.4);}
 .publisher-status-dot.offline{background:var(--text-3);}
 .publisher-status-dot.expired{background:var(--red);}
 
 /* SESSION EXPIRED OVERLAY */
-.session-expired-overlay{
-  position:fixed;inset:0;z-index:2000;
-  background:rgba(0,0,0,.75);
-  display:none;align-items:center;justify-content:center;
-  backdrop-filter:blur(6px);
-  animation:fadeIn .3s both;
-}
+.session-expired-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);animation:fadeIn .3s both;}
 .session-expired-overlay.show{display:flex;}
-.session-expired-box{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:32px 28px;
-  text-align:center;max-width:380px;width:90%;
-  box-shadow:var(--shadow);
-  animation:slideUp .35s var(--trans) both;
-}
-.session-expired-icon{
-  width:52px;height:52px;border-radius:50%;
-  background:var(--red-dim);border:1px solid rgba(224,82,82,.3);
-  display:grid;place-items:center;margin:0 auto 16px;
-}
+.session-expired-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px 28px;text-align:center;max-width:380px;width:90%;box-shadow:var(--shadow);animation:slideUp .35s var(--trans) both;}
+.session-expired-icon{width:52px;height:52px;border-radius:50%;background:var(--red-dim);border:1px solid rgba(224,82,82,.3);display:grid;place-items:center;margin:0 auto 16px;}
 .session-expired-icon svg{color:var(--red);width:22px;}
-.session-expired-title{
-  font-family:'DM Serif Display',serif;font-size:20px;
-  color:var(--text);margin-bottom:8px;
-}
+.session-expired-title{font-family:'DM Serif Display',serif;font-size:20px;color:var(--text);margin-bottom:8px;}
 .session-expired-msg{font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:22px;}
-.expired-countdown{
-  font-family:'DM Mono',monospace;font-size:13px;
-  color:var(--amber);margin-top:12px;
-}
+.expired-countdown{font-family:'DM Mono',monospace;font-size:13px;color:var(--amber);margin-top:12px;}
 .hidden{display:none!important;}
 
 /* CERT LOGIN BUTTON */
-.cert-login-btn{
-  width:100%;margin-top:12px;
-  display:flex;align-items:center;gap:12px;
-  padding:13px 16px;border-radius:var(--radius-sm);
-  border:1px solid var(--border);background:var(--card-bg);
-  cursor:pointer;font-family:'DM Sans',sans-serif;
-  font-size:13px;font-weight:400;color:var(--text-2);
-  transition:all .25s var(--trans);text-align:left;
-}
+.cert-login-btn{width:100%;margin-top:12px;display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card-bg);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:400;color:var(--text-2);transition:all .25s var(--trans);text-align:left;}
 .cert-login-btn:hover{border-color:rgba(91,156,246,.4);color:var(--text);background:var(--blue-dim);}
 .cert-login-btn:disabled{opacity:.5;cursor:not-allowed;}
-.cert-login-btn .cert-icon{
-  width:32px;height:32px;border-radius:8px;flex-shrink:0;
-  background:var(--blue-dim);border:1px solid rgba(91,156,246,.25);
-  display:grid;place-items:center;color:var(--blue);
-}
+.cert-login-btn .cert-icon{width:32px;height:32px;border-radius:8px;flex-shrink:0;background:var(--blue-dim);border:1px solid rgba(91,156,246,.25);display:grid;place-items:center;color:var(--blue);}
 .cert-login-btn .cert-icon svg{width:15px;height:15px;}
 .cert-login-btn .cert-text{flex:1;}
 .cert-login-btn .cert-title{font-size:13px;font-weight:500;color:var(--text);line-height:1.3;}
 .cert-login-btn .cert-sub{font-size:11px;color:var(--text-3);margin-top:1px;}
-.cert-login-btn .cert-spin{
-  width:15px;height:15px;flex-shrink:0;
-  border:2px solid rgba(91,156,246,.25);border-top-color:var(--blue);
-  border-radius:50%;animation:spin .7s linear infinite;display:none;
-}
+.cert-login-btn .cert-spin{width:15px;height:15px;flex-shrink:0;border:2px solid rgba(91,156,246,.25);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;display:none;}
 .cert-login-btn.loading .cert-spin{display:block;}
 .cert-login-btn.loading .cert-arrow{display:none;}
 .cert-arrow{color:var(--text-3);flex-shrink:0;}
 .cert-arrow svg{width:15px;height:15px;}
 
 /* CERT WAITING MODAL */
-.cert-modal-overlay{
-  position:fixed;inset:0;z-index:3000;
-  background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
-  display:none;align-items:center;justify-content:center;
-  animation:fadeIn .2s both;
-}
+.cert-modal-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;animation:fadeIn .2s both;}
 .cert-modal-overlay.show{display:flex;}
-.cert-modal{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:32px 28px;
-  max-width:360px;width:90%;text-align:center;
-  box-shadow:var(--shadow);animation:slideUp .3s var(--trans) both;
-}
-.cert-modal-icon{
-  width:56px;height:56px;border-radius:50%;margin:0 auto 18px;
-  background:var(--blue-dim);border:1px solid rgba(91,156,246,.3);
-  display:grid;place-items:center;
-}
+.cert-modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px 28px;max-width:360px;width:90%;text-align:center;box-shadow:var(--shadow);animation:slideUp .3s var(--trans) both;}
+.cert-modal-icon{width:56px;height:56px;border-radius:50%;margin:0 auto 18px;background:var(--blue-dim);border:1px solid rgba(91,156,246,.3);display:grid;place-items:center;}
 .cert-modal-icon svg{color:var(--blue);width:24px;}
-.cert-modal-ring{
-  width:56px;height:56px;border-radius:50%;margin:0 auto 18px;
-  border:2px solid var(--border);border-top-color:var(--blue);
-  animation:spin .9s linear infinite;display:none;
-}
+.cert-modal-ring{width:56px;height:56px;border-radius:50%;margin:0 auto 18px;border:2px solid var(--border);border-top-color:var(--blue);animation:spin .9s linear infinite;display:none;}
 .cert-modal.waiting .cert-modal-icon{display:none;}
 .cert-modal.waiting .cert-modal-ring{display:block;}
-.cert-modal-title{
-  font-family:'DM Serif Display',serif;font-size:19px;
-  color:var(--text);margin-bottom:8px;
-}
+.cert-modal-title{font-family:'DM Serif Display',serif;font-size:19px;color:var(--text);margin-bottom:8px;}
 .cert-modal-desc{font-size:13px;color:var(--text-3);line-height:1.7;margin-bottom:20px;}
-.cert-modal-steps{
-  background:var(--glass);border:1px solid var(--border);
-  border-radius:var(--radius-sm);padding:14px;text-align:left;
-  margin-bottom:20px;display:flex;flex-direction:column;gap:8px;
-}
+.cert-modal-steps{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:left;margin-bottom:20px;display:flex;flex-direction:column;gap:8px;}
 .cert-step{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--text-2);}
-.cert-step-num{
-  width:18px;height:18px;border-radius:50%;flex-shrink:0;
-  background:var(--amber-glow);border:1px solid rgba(212,168,75,.3);
-  color:var(--amber);font-size:10px;font-weight:600;
-  display:grid;place-items:center;margin-top:1px;
-}
-.cert-modal-status{
-  font-family:'DM Mono',monospace;font-size:11px;
-  color:var(--text-3);margin-bottom:16px;min-height:18px;
-}
+.cert-step-num{width:18px;height:18px;border-radius:50%;flex-shrink:0;background:var(--amber-glow);border:1px solid rgba(212,168,75,.3);color:var(--amber);font-size:10px;font-weight:600;display:grid;place-items:center;margin-top:1px;}
+.cert-modal-status{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);margin-bottom:16px;min-height:18px;}
 </style>
 </head>
 <body>
@@ -497,12 +412,8 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
       </div>
       <div id="msg-auth" class="status-msg"></div>
 
-      <!-- DIVISOR -->
-      <div class="auth-divider">
-        <span>ou</span>
-      </div>
+      <div class="auth-divider"><span>ou</span></div>
 
-      <!-- PUBLISHER SYNC -->
       <div id="publisher-section">
         <div class="publisher-card" id="publisher-card">
           <div class="publisher-header">
@@ -517,7 +428,6 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
             </div>
             <div class="publisher-status-dot" id="pub-dot" title="Verificando..."></div>
           </div>
-
           <div id="pub-info" style="display:none;margin-top:10px;">
             <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:6px;">
               <span>Expiração</span>
@@ -533,17 +443,14 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
               <span class="btn-label">Injetar sessão do Publisher</span>
             </button>
           </div>
-
           <div id="pub-unavailable" style="font-size:12px;color:var(--text-3);margin-top:8px;text-align:center;">
             Verificando disponibilidade...
           </div>
         </div>
       </div>
 
-      <!-- DIVISOR -->
       <div class="auth-divider"><span>ou</span></div>
 
-      <!-- CERTIFICADO DIGITAL -->
       <button class="cert-login-btn" id="btn-cert-login" onclick="loginComCertificado()">
         <div class="cert-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -561,10 +468,9 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </button>
-
     </div>
   </div>
-</div><!-- /auth-panel -->
+</div>
 
 <!-- MODAL DE ESPERA — LOGIN COM CERTIFICADO -->
 <div class="cert-modal-overlay" id="cert-modal-overlay">
@@ -580,24 +486,7 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
     <div class="cert-modal-desc" id="cert-modal-desc">
       Uma janela do navegador foi aberta. Siga os passos para autenticar com seu token.
     </div>
-    <div class="cert-modal-steps" id="cert-modal-steps">
-      <div class="cert-step">
-        <div class="cert-step-num">1</div>
-        <span>Na janela aberta, selecione o certificado <strong>CERTSIGN RFB</strong> detectado pelo Web PKI</span>
-      </div>
-      <div class="cert-step">
-        <div class="cert-step-num">2</div>
-        <span>Clique em <strong>Acessar</strong> e aguarde o popup de senha do token</span>
-      </div>
-      <div class="cert-step">
-        <div class="cert-step-num">3</div>
-        <span>Digite a <strong>senha do token</strong> no popup do Web PKI e confirme</span>
-      </div>
-      <div class="cert-step">
-        <div class="cert-step-num">4</div>
-        <span>Aguarde — a sessão será capturada automaticamente</span>
-      </div>
-    </div>
+    <div class="cert-modal-steps" id="cert-modal-steps"></div>
     <div class="cert-modal-status" id="cert-modal-status">Aguardando autenticação...</div>
     <button class="btn btn-outline btn-full" onclick="cancelarLoginCertificado()" id="btn-cert-cancel">
       Cancelar
@@ -629,9 +518,7 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
     <div class="card">
       <div class="card-header">
         <span class="card-title">Consultar Documento</span>
-        <!-- Feature 1: pasta de destino + Feature 4: switch OFICIAL/CLONE -->
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <!-- PDF Mode switch -->
           <div class="pdf-mode-switch" id="pdf-mode-switch" title="OFICIAL: baixa o PDF do ONR. CLONE: gera PDF local idêntico.">
             <span class="pms-label" id="pms-label-oficial">OFICIAL</span>
             <div class="pms-track" onclick="togglePdfMode()">
@@ -639,7 +526,6 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
             </div>
             <span class="pms-label" id="pms-label-clone">CLONE</span>
           </div>
-          <!-- Pasta destino pesquisa única -->
           <div style="display:flex;align-items:center;gap:6px;">
             <div class="folder-display" id="single-folder-display" style="font-size:11.5px;padding:7px 11px;min-height:0;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default;" title="Auto-download para esta pasta">
               Sem pasta
@@ -654,8 +540,7 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
         </div>
       </div>
       <div class="card-body">
-
-        <!-- Nº Pedido + Feito por — mesma linha, mesmo alinhamento de base -->
+        <!-- FIX #1: "Feito por" with default placeholder "Julio Moreira" -->
         <div class="form-row">
           <div class="field narrow">
             <label class="flabel">Nº Pedido</label>
@@ -663,11 +548,10 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
           </div>
           <div class="field wide">
             <label class="flabel">Feito por</label>
-            <input type="text" id="feito-por-single" placeholder="Ex: Julio Moreira" onkeydown="if(event.key==='Enter')consultar()"/>
+            <input type="text" id="feito-por-single" placeholder="Julio Moreira" onkeydown="if(event.key==='Enter')consultar()"/>
           </div>
         </div>
 
-        <!-- CPF / CNPJ -->
         <div class="field">
           <label class="flabel">CPF ou CNPJ</label>
           <div class="search-row">
@@ -702,9 +586,10 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
         </div>
       </div>
       <div class="card-body">
+        <!-- FIX #1: "Feito por" placeholder default "Julio Moreira" in lote too -->
         <div class="field" style="margin-bottom:16px;">
           <label class="flabel">Feito por (operador responsável)</label>
-          <input type="text" id="ml-feito-por" placeholder="Ex: Julio Moreira"/>
+          <input type="text" id="ml-feito-por" placeholder="Julio Moreira"/>
         </div>
         <div class="divider" style="margin-bottom:16px;"></div>
 
@@ -826,6 +711,8 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 <script>
 "use strict";
 
+const DEFAULT_FEITO_POR = 'Julio Moreira';
+
 const STATE = {
   authenticated: false,
   currentResult: null,
@@ -875,7 +762,7 @@ function clearSingleFolder() {
 }
 
 // ── FEATURE 4: PDF MODE SWITCH ────────────────────────────
-STATE.pdfMode = 'oficial'; // 'oficial' | 'clone'
+STATE.pdfMode = 'oficial';
 document.documentElement.setAttribute('data-pdf-mode', 'oficial');
 
 function togglePdfMode() {
@@ -883,12 +770,11 @@ function togglePdfMode() {
   document.documentElement.setAttribute('data-pdf-mode', STATE.pdfMode);
   const lbl = document.getElementById('pdf-btn-label');
   if (lbl) lbl.textContent = STATE.pdfMode === 'clone' ? 'Gerar PDF Clone' : 'Baixar Certidão PDF';
-  // No modo clone o indicador de background não é relevante
   const ind = document.getElementById('pdf-indicator');
   if (ind && STATE.pdfMode === 'clone') ind.classList.remove('show');
 }
 
-// ── FEATURE 3: EDITAR ITEM DO LOTE ───────────────────────
+// ── EDIT ITEM DO LOTE ────────────────────────────────────
 function mlEditItem(id) {
   const item = STATE.mlQueue.find(i => i.id === id);
   if (!item) return;
@@ -917,96 +803,7 @@ function saveEditItem() {
   renderMLQueue();
 }
 
-// ── FEATURE 4: GERAR PDF CLONE ───────────────────────────
-async function generateClonePDF(data, rawDoc, pedido, feitoPor) {
-  const h = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-  const nomeAlvo = (data.person?.currentPersonName || data.hashResult?.personName || 'DESCONHECIDO').toUpperCase();
-  const docAlvo  = data.person?.documentNumber || ((() => {
-    const d = rawDoc.replace(/\D/g,'');
-    if (d.length===11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4');
-    if (d.length===14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
-    return d;
-  })());
-
-  // CPF do responsável = dono do token (vem do ONR como documentNumber)
-  const cpfToken = data.person?.documentNumber || '—';
-  // Responsável pela consulta = feitoPor digitado pelo usuário
-  const nomeResp = feitoPor ? feitoPor.toUpperCase() : '—';
-
-  const hash      = data.hashResult?.hash || data.hash || 'vzkkait5zq';
-  const orders    = data.orders || [];
-  const isNeg     = orders.length === 0;
-  const statusTexto = isNeg ? 'NEGATIVO' : 'POSITIVO';
-  const dataHora  = new Date().toLocaleString('pt-BR');
-  const qrUrl     = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://indisponibilidade.onr.org.br//home/validar';
-
-  const iconNegative = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>';
-
-  let htmlRes = '';
-  if (isNeg) {
-    htmlRes = '<div class="result-container"><div class="result-icon">' + iconNegative + '</div><div class="result-text-neg">N\u00c3O FORAM ENCONTRADA(S) INDISPONIBILIDADE(S) GEN\u00c9RICA(S) E<br>ESPEC\u00cdFICA(S) PARA O DOCUMENTO PESQUISADO</div></div>';
-  } else {
-    htmlRes = '<div class="result-text-pos">Constam no cadastro da CNIB, as seguintes ocorr\u00eancias:</div><div class="items-list">';
-    orders.forEach(o => {
-      htmlRes += '<div class="item-box">' +
-        '<div class="item-line"><span class="item-label">PROTOCOLO:</span> ' + h(o.protocol||'—') + '</div>' +
-        '<div class="item-line"><span class="item-label">N\u00daMERO DO PROCESSO:</span> ' + h(o.processNumber||'—') + '</div>' +
-        '<div class="item-line"><span class="item-label">TIPO:</span> ' + h(o.processName||'—') + '</div>' +
-        '<div class="item-line"><span class="item-label">EMISSOR DA ORDEM:</span> ' + h(o.organizationLabel||'—') + '</div>' +
-        '</div>';
-    });
-    htmlRes += '</div>';
-  }
-
-  const css = '* { box-sizing: border-box; } body { font-family: Arial, sans-serif; color: #000; margin: 0; padding: 0; font-size: 9.5pt; line-height: 1.3; background: #fff; } @page { margin: 15mm 20mm; size: A4; } .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid #000; margin-bottom: 25px; } .logo-cnib { width: 170px; } .logo-onr { width: 150px; } .main-title { font-size: 16pt; font-weight: bold; text-align: left; margin-bottom: 25px; } .sec-header { font-size: 13pt; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 15px; } .dados-grid { display: flex; margin-bottom: 25px; } .dados-col { flex: 1; } .dados-label { font-size: 8pt; font-weight: bold; text-transform: uppercase; margin-bottom: 3px; } .dados-val { font-size: 10pt; text-transform: uppercase;} .res-label { font-size: 13pt; font-weight: bold; margin-bottom: 20px; } .result-container { display: flex; align-items: center; margin-bottom: 35px; padding-left: 5px; } .result-icon { width: 32px; height: 32px; margin-right: 15px; } .result-text-neg { font-weight: bold; font-size: 11pt; } .result-text-pos { margin-bottom: 20px; font-size: 10pt; } .item-box { margin-bottom: 25px; page-break-inside: avoid; } .item-line { margin-bottom: 4px; font-size: 9.5pt; text-transform: uppercase; } .item-label { font-weight: bold; } .legal-text { font-size: 9pt; text-align: justify; margin-bottom: 10px; } .validation-box { border: 1px solid #a0a0a0; border-radius: 5px; padding: 15px; margin-top: 30px; display: flex; align-items: center; page-break-inside: avoid; } .qr-wrapper { border-right: 1px solid #a0a0a0; padding-right: 20px; margin-right: 20px; } .qr-code { width: 80px; height: 80px; display: block; } .val-info { flex: 1; text-align: center; } .val-title { font-weight: bold; font-size: 8.5pt; margin-bottom: 10px; text-transform: none; } .hash-label { font-size: 8pt; margin-bottom: 2px; } .hash-val { font-weight: bold; font-size: 11pt; margin-bottom: 10px; } .url-val { font-size: 7.5pt; color: #000; text-decoration: none; } .footer-table { width: 100%; border: 1px solid #a0a0a0; border-radius: 5px; margin-top: 15px; border-collapse: separate; border-spacing: 0; page-break-inside: avoid; } .footer-table td { padding: 10px; font-size: 8pt; vertical-align: top; border-right: 1px solid #a0a0a0; } .footer-table td:last-child { border-right: none; } .ft-label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 7.5pt;} .page-footer { display: flex; justify-content: space-between; margin-top: 40px; font-size: 7.5pt; border-top: 1px solid #ccc; padding-top: 10px; page-break-inside: avoid; } .footer-right { text-align: right; }';
-
-  const bodyParts = [
-    '<html><head><title>Relat\u00f3rio CNIB</title><style>' + css + '</style></head><body>',
-    '<div class="header">',
-    '<img src="./assets/CNIB-EXTENSO-AZUL.png" class="logo-cnib" onerror="this.style.display=\'none\'">',
-    '<img src="./assets/logo-onr-novo.png" class="logo-onr" onerror="this.style.display=\'none\'">',
-    '</div>',
-    '<div class="main-title">Relat\u00f3rio de Consulta de Indisponibilidade de Bens</div>',
-    '<div class="sec-header">Dados Pesquisados</div>',
-    '<div class="dados-grid">',
-    '<div class="dados-col" style="max-width:250px;"><div class="dados-label">CPF</div><div class="dados-val">' + h(docAlvo) + '</div></div>',
-    '<div class="dados-col"><div class="dados-label">NOME</div><div class="dados-val">' + h(nomeAlvo) + '</div></div>',
-    '</div>',
-    '<div class="res-label">Resultado: ' + h(statusTexto) + '</div>',
-    htmlRes,
-    '<div class="sec-header">Informa\u00e7\u00f5es Importantes</div>',
-    '<div class="legal-text">Este Relat\u00f3rio foi emitido pela Central Nacional de Indisponibilidade de Bens (CNIB), com base nos artigos 7\u00ba e 9\u00ba do Provimento CNJ n\u00ba 39/2014, de 25/7/2014, da Corregedoria Nacional de Justi\u00e7a do Conselho Nacional de Justi\u00e7a (CNJ).</div>',
-    '<div class="legal-text">A informa\u00e7\u00e3o negativa n\u00e3o significa inexist\u00eancia de indisponibilidades anteriormente decretadas, assim como eventuais indisponibilidades relacionadas referem-se apenas \u00e0s ordens que foram cadastradas a partir das referidas datas. Em caso positivo s\u00e3o indicados os n\u00fameros dos processos de execu\u00e7\u00f5es trabalhistas, fiscais e c\u00edveis, bem como os respectivos Tribunais em que tramitam, ressalvadas informa\u00e7\u00f5es de processos que correm em segredo de justi\u00e7a e em sigilo de justi\u00e7a. Nessas hip\u00f3teses \u00e9 mantida a informa\u00e7\u00e3o do resultado positivo, devendo o interessado reportar-se diretamente aos Ju\u00edzos ou inst\u00e2ncias administrativas competentes que decretaram a indisponibilidade de bens.</div>',
-    '<div class="legal-text">Os dados constantes deste relat\u00f3rio s\u00e3o de responsabilidade direta dos respectivos \u00f3rg\u00e3os do Poder Judici\u00e1rio e da Administra\u00e7\u00e3o P\u00fablica que os cadastraram.</div>',
-    '<div class="legal-text">Para informa\u00e7\u00f5es mais completas sobre a situa\u00e7\u00e3o jur\u00eddica da pessoa pesquisada dever\u00e3o ser feitas pesquisas de maior abrang\u00eancia nos \u00f3rg\u00e3os do Poder Judici\u00e1rio e da Administra\u00e7\u00e3o P\u00fablica.</div>',
-    '<div class="validation-box">',
-    '<div class="qr-wrapper"><img src="' + qrUrl + '" class="qr-code" onerror="this.style.display=\'none\'"></div>',
-    '<div class="val-info"><div class="val-title">Validar autenticidade</div><div class="hash-label">Hash:</div><div class="hash-val">' + h(hash) + '</div><a href="https://indisponibilidade.org.br" class="url-val">https://indisponibilidade.org.br</a></div>',
-    '</div>',
-    '<table class="footer-table"><tr>',
-    '<td width="30%"><span class="ft-label">Emitido em:</span>' + h(dataHora) + '</td>',
-    '<td width="40%"><span class="ft-label">Respons\u00e1vel pela Consulta:</span>' + h(nomeResp) + '</td>',
-    '<td width="30%"><span class="ft-label">CPF do Respons\u00e1vel:</span>' + h(cpfToken) + '</td>',
-    '</tr></table>',
-    '<div class="page-footer"><div>Data e Hora deste Relat\u00f3rio: ' + h(dataHora) + '<br>https://indisponibilidade.org.br</div>',
-    '<div class="footer-right"><strong>Relat\u00f3rio de Consulta de Indisponibilidade de Bens</strong><br></div></div>',
-    '<script>window.onload = function() { setTimeout(() => { window.print(); }, 800); }<\/script>',
-    '</body></html>'
-  ];
-  const html = bodyParts.join('');
-
-  const win = window.open('', '_blank', 'width=900,height=900');
-  if (!win) {
-    showMsg('msg-pesquisa', 'Permita pop-ups para gerar o PDF Clone.', 'warn');
-    return null;
-  }
-  win.document.write(html);
-  win.document.close();
-  return win;
-}
-
-// ── FEATURE 5: GERAR PDF CLONE E SALVAR DIRETO (via servidor, silenciosamente) ──
+// ── GERAR PDF CLONE (SERVIDOR) ────────────────────────────
 async function generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename) {
   const cookies = localStorage.getItem('onr_cookies');
   if (!cookies) { sessaoExpirada(); return; }
@@ -1015,12 +812,9 @@ async function generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename)
   if (btn) btn.disabled = true;
 
   const documento = (data.person?.documentNumber || rawDoc || '').replace(/\D/g,'');
-  
-  // Responsável vem do token ONR (hashResult)
-  const responsavelNome = (data.hashResult?.personName || '').toUpperCase() || 'DESCONHECIDO';
+  const responsavelNome = (feitoPor || DEFAULT_FEITO_POR).toUpperCase();
+
   let responsavelCPF = (data.hashResult?.documentNumber || '').replace(/\D/g,'');
-  
-  // Máscara o CPF do responsável corretamente: 179.***.***-**
   if (responsavelCPF.length === 11) {
     const primeiros3 = responsavelCPF.substring(0, 3);
     responsavelCPF = `${primeiros3}.***.***-**`;
@@ -1035,67 +829,44 @@ async function generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename)
   const statusTexto = orders.length > 0 ? 'POSITIVO' : 'NEGATIVO';
 
   try {
-    // Chama endpoint /api/pdf-clone no servidor COM DADOS CORRETOS
     const res = await fetch('/api/pdf-clone', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        cookies,
-        documento,
-        responsavelNome,
-        responsavelCPF,
-        orders,
-        nomeAlvo,
-        statusTexto
-      })
+      body: JSON.stringify({ cookies, documento, responsavelNome, responsavelCPF, orders, nomeAlvo, statusTexto })
     });
 
-    if (res.status === 401) {
-      if (btn) btn.disabled = false;
-      sessaoExpirada();
-      return;
-    }
+    if (res.status === 401) { if (btn) btn.disabled = false; sessaoExpirada(); return; }
 
     if (!res.ok) {
       if (btn) btn.disabled = false;
       const err = await res.json().catch(() => ({erro:'Erro ao processar requisição'}));
-      console.error('[PDF-CLONE] Erro do servidor:', err);
       showMsg('msg-pesquisa', `Erro ao gerar PDF Clone: ${err.erro || 'Erro desconhecido'}`, 'error');
       return;
     }
 
     const blob = await res.blob();
-    
     if (blob.size === 0) {
       if (btn) btn.disabled = false;
-      console.error('[PDF-CLONE] Blob vazio recebido');
       showMsg('msg-pesquisa', 'Erro: PDF Clone vazio. Tente novamente.', 'error');
       return;
     }
-    
-    // Salva silenciosamente na pasta ou faz download
+
     await savePDFBlobSilent(blob, filename, 'PDF Clone gerado com sucesso');
-    
     if (btn) btn.disabled = false;
   } catch (err) {
     if (btn) btn.disabled = false;
-    console.error('[PDF-CLONE] Erro ao gerar PDF Clone:', err);
     showMsg('msg-pesquisa', `Erro ao gerar PDF Clone: ${err.message || 'Erro desconhecido'}`, 'error');
   }
 }
 
-// ── SALVAR BLOB DE PDF SILENCIOSAMENTE ─────────────────────────
 async function savePDFBlobSilent(blob, filename, successMsg='PDF salvo') {
-  // Tenta salvar direto na pasta se definida (silenciosamente)
   if (STATE.singleFolderHandle) {
     try {
       const fileHandle = await STATE.singleFolderHandle.getFileHandle(filename, {create:true});
       const writable   = await fileHandle.createWritable();
       await writable.write(blob);
       await writable.close();
-      
       try { await navigator.clipboard.writeText(filename); } catch {}
-      
       const indicator = document.getElementById('pdf-indicator');
       if (indicator) {
         indicator.classList.add('done');
@@ -1104,22 +875,15 @@ async function savePDFBlobSilent(blob, filename, successMsg='PDF salvo') {
         if (t) t.textContent = `${successMsg} em "${STATE.singleFolderHandle.name}"`;
       }
       return;
-    } catch (err) {
-      console.error('Erro ao salvar em pasta:', err);
-      // Falhou ao salvar na pasta — cai no download normal do navegador
-    }
+    } catch (err) { /* fallback to download */ }
   }
-
-  // Fallback: Download normal pelo navegador
   const url = URL.createObjectURL(blob);
   const a   = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-
   try { await navigator.clipboard.writeText(filename); } catch {}
-
   const indicator = document.getElementById('pdf-indicator');
   if (indicator) {
     const t = indicator.querySelector('#pdf-indicator-text');
@@ -1134,7 +898,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (localStorage.getItem('onr_cookies')) {
     setAuthenticated(true);
   } else {
-    // Não há sessão — mostra painel de auth e inicia verificação do Publisher
     setAuthenticated(false);
   }
 });
@@ -1149,11 +912,9 @@ function setAuthenticated(auth) {
   document.getElementById('btn-sair').style.display = auth ? '' : 'none';
 
   if (!auth) {
-    // Verifica imediatamente e depois a cada 30s enquanto no painel de auth
     verificarPublisher().catch(() => {});
     if (!_pubPollInterval) {
       _pubPollInterval = setInterval(() => {
-        // Só continua polling se ainda está no painel de auth
         if (!STATE.authenticated) {
           verificarPublisher().catch(() => {});
         } else {
@@ -1163,7 +924,6 @@ function setAuthenticated(auth) {
       }, 30000);
     }
   } else {
-    // Autenticado — para o polling do Publisher
     if (_pubPollInterval) {
       clearInterval(_pubPollInterval);
       _pubPollInterval = null;
@@ -1176,17 +936,12 @@ function sair() {
   setAuthenticated(false);
 }
 
-// ── SESSÃO EXPIRADA — redirect automático ──────────────────
 function sessaoExpirada() {
-  // Limpa dados
   localStorage.removeItem('onr_cookies');
   STATE.authenticated = false;
-
-  // Mostra overlay
   const overlay   = document.getElementById('session-expired-overlay');
   const countdown = document.getElementById('expired-countdown');
   overlay.classList.add('show');
-
   let secs = 3;
   const tick = setInterval(() => {
     secs--;
@@ -1211,7 +966,7 @@ const BLACKLIST = new Set(['_dd_s']);
 
 let _pubIdToken = '';
 let _pubIdTokenExp = 0;
-let _pubPayload = null; // payload mais recente do Firestore
+let _pubPayload = null;
 
 async function pubGetToken() {
   if (_pubIdToken && _pubIdTokenExp > Date.now()) return _pubIdToken;
@@ -1260,19 +1015,16 @@ async function pubFetchLatest() {
   const data = await r.json();
   const docs = data.documents || [];
   if (!docs.length) return null;
-
   for (const doc of docs) {
     const f       = doc.fields || {};
     const domain  = f.domain?.stringValue || '';
     const status  = f.status?.stringValue || '';
     const expAt   = Number(f.expires_at?.integerValue || f.expireAt?.integerValue || 0);
     const cookies = pubParseCookies(f.cookies?.arrayValue?.values || []);
-
     if (domain !== 'indisponibilidade.onr.org.br') continue;
     if (status !== 'ACTIVE') continue;
     if (expAt <= Date.now()) continue;
     if (!pubHasRequired(cookies)) continue;
-
     return { cookies, expAt };
   }
   return null;
@@ -1282,11 +1034,9 @@ async function verificarPublisher() {
   const dot         = document.getElementById('pub-dot');
   const info        = document.getElementById('pub-info');
   const unavailable = document.getElementById('pub-unavailable');
-
   try {
     const payload = await pubFetchLatest();
     _pubPayload = payload;
-
     if (!payload) {
       dot.className = 'publisher-status-dot offline';
       info.style.display = 'none';
@@ -1294,17 +1044,13 @@ async function verificarPublisher() {
       unavailable.style.display = 'block';
       return;
     }
-
-    // Sessão disponível
     dot.className = 'publisher-status-dot online';
     unavailable.style.display = 'none';
     info.style.display = 'block';
-
     const expDate = new Date(payload.expAt);
     document.getElementById('pub-expire').textContent =
       expDate.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
     document.getElementById('pub-count').textContent = payload.cookies.length;
-
   } catch {
     dot.className = 'publisher-status-dot offline';
     document.getElementById('pub-info').style.display = 'none';
@@ -1317,17 +1063,13 @@ async function loginViaPublisher() {
   if (!_pubPayload) { showMsg('msg-auth', 'Nenhuma sessão do Publisher disponível.', 'error'); return; }
   setBtnLoading('btn-publisher', true);
   hideMsg('msg-auth');
-
   try {
     const cookieString = pubCookiesToString(_pubPayload.cookies);
-
-    // Valida no servidor igual ao fluxo normal
     const r = await fetch('/api/validar', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ cookies: cookieString })
     });
     const d = await r.json();
-
     if (r.ok && d.sucesso) {
       localStorage.setItem('onr_cookies', cookieString);
       setAuthenticated(true);
@@ -1416,15 +1158,15 @@ function validCNPJ(c) {
 
 function docForFilename(raw) {
   const d = raw.replace(/\D/g,'');
-  if (d.length === 11) {
-    // CPF: 000.000.000-00
-    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  }
-  if (d.length === 14) {
-    // CNPJ sem barra: 00.000.000.0000-00
-    return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3.$4-$5');
-  }
+  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3.$4-$5');
   return d;
+}
+
+// ── FIX #1: helper to get "feito por" with default ────────
+function getFeitoPor(fieldId) {
+  const val = document.getElementById(fieldId)?.value.trim();
+  return val || DEFAULT_FEITO_POR;
 }
 
 // ── CONSULTA ───────────────────────────────────────────────
@@ -1438,13 +1180,16 @@ async function consultar() {
   hideMsg('msg-pesquisa');
 
   const pedido   = document.getElementById('pedido-single').value.trim();
-  const feitoPor = document.getElementById('feito-por-single').value.trim();
+  // FIX #1: use default if empty
+  const feitoPor = getFeitoPor('feito-por-single');
   const docValue = input.value.trim();
 
-  // Limpa o campo doc imediatamente
+  // FIX #2: Reset campos após iniciar pesquisa
   input.value = '';
   input.classList.remove('input-valid','input-invalid');
   document.getElementById('doc-hint-search').classList.remove('show');
+  document.getElementById('pedido-single').value = '';
+  // "Feito por" mantém o valor para conveniência (não limpa)
 
   await _doConsulta(docValue, cookies, 0, pedido, feitoPor);
 }
@@ -1476,8 +1221,8 @@ async function _doConsulta(doc, cookies, attempt, pedido='', feitoPor='') {
     }
 
     lb.classList.remove('show');
-    STATE.currentResult  = data;
-    STATE.currentPedido  = pedido;
+    STATE.currentResult   = data;
+    STATE.currentPedido   = pedido;
     STATE.currentFeitoPor = feitoPor;
     renderResult(data, doc, attempt, pedido, feitoPor);
     addHistory(doc, data, pedido, feitoPor);
@@ -1498,6 +1243,8 @@ function renderResult(data, rawDoc, attempt=0, pedido='', feitoPor='') {
   const orders = data.orders || [];
   const isNeg  = orders.length === 0;
   const isPNC  = nome.toUpperCase().includes('PESSOA NÃO CADASTRADA');
+  // Use default if empty
+  const feitoPorDisplay = feitoPor || DEFAULT_FEITO_POR;
 
   let html = `<div class="stagger" style="width:100%;display:flex;flex-direction:column;gap:14px;">`;
 
@@ -1506,7 +1253,7 @@ function renderResult(data, rawDoc, attempt=0, pedido='', feitoPor='') {
       <div>
         <div class="person-name">${esc(nome)}</div>
         <div class="person-doc">${esc(docFmt)}</div>
-        ${pedido ? `<div style="font-size:11px;color:var(--text-3);margin-top:4px;font-family:'DM Mono',monospace;">Pedido #${esc(pedido)}${feitoPor ? ` · Feito por ${esc(feitoPor)}` : ''}</div>` : ''}
+        ${pedido ? `<div style="font-size:11px;color:var(--text-3);margin-top:4px;font-family:'DM Mono',monospace;">Pedido #${esc(pedido)} · Feito por ${esc(feitoPorDisplay)}</div>` : `<div style="font-size:11px;color:var(--text-3);margin-top:4px;font-family:'DM Mono',monospace;">Feito por ${esc(feitoPorDisplay)}</div>`}
         ${isPNC&&attempt>=3 ? `<div class="status-msg warn show" style="margin-top:8px;">Após 3 tentativas o nome retornou como "Pessoa Não Cadastrada".</div>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
@@ -1516,7 +1263,6 @@ function renderResult(data, rawDoc, attempt=0, pedido='', feitoPor='') {
           <div class="pdf-spin"></div>
           <span id="pdf-btn-label">${STATE.pdfMode === 'clone' ? 'Gerar PDF Clone' : 'Baixar Certidão PDF'}</span>
         </button>
-        <!-- indicador de preparação do PDF em background -->
         <div class="pdf-indicator show" id="pdf-indicator">
           <div class="pi-spin"></div>
           <span id="pdf-indicator-text">Preparando PDF em background...</span>
@@ -1539,21 +1285,12 @@ function renderResult(data, rawDoc, attempt=0, pedido='', feitoPor='') {
         <div class="neg-msg">Não constam registros de indisponibilidade de bens no sistema ONR para o documento consultado.</div>
       </div>`;
   } else {
+    // FIX #4: use orders-list (full-width rows) instead of orders-grid
     html += `
       <div class="result-toolbar">
         <div class="count-text">Encontradas <strong>${orders.length}</strong> indisponibilidade${orders.length>1?'s':''} vinculada${orders.length>1?'s':''}</div>
-        <div class="view-toggle">
-          <button class="active" id="vt-normal" onclick="setViewMode('normal')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Padrão
-          </button>
-          <button id="vt-grouped" onclick="setViewMode('grouped')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            Agrupar por Processo
-          </button>
-        </div>
       </div>
-      <div id="orders-grid" class="orders-grid">${renderOrderCards(orders,'normal')}</div>`;
+      <div id="orders-container" class="orders-list">${renderOrderCards(orders)}</div>`;
   }
 
   html += `</div>`;
@@ -1561,7 +1298,6 @@ function renderResult(data, rawDoc, attempt=0, pedido='', feitoPor='') {
   rz.style.display = 'flex';
   rz.classList.add('show');
 
-  // Faz polling no status do PDF em background
   pollPDFStatus();
 }
 
@@ -1572,14 +1308,13 @@ async function pollPDFStatus() {
   if (!indicator) return;
 
   const cookies = localStorage.getItem('onr_cookies');
-  const maxWait = 50; // max 50 iterações × 1s = 50s
+  const maxWait = 50;
   let tries = 0;
   let notStartedCount = 0;
 
   while (tries < maxWait) {
     await delay(1000);
     tries++;
-    // Para o polling se o resultado foi substituído por nova pesquisa
     if (!document.getElementById('pdf-indicator')) return;
 
     try {
@@ -1597,27 +1332,17 @@ async function pollPDFStatus() {
         if (indText) indText.textContent = 'PDF pronto para download';
         return;
       }
-      if (d.status === 'error') {
-        indicator.classList.remove('show');
-        return;
-      }
+      if (d.status === 'error') { indicator.classList.remove('show'); return; }
       if (d.status === 'not_started') {
-        // Ainda não iniciou — espera até 5s antes de desistir
         notStartedCount++;
-        if (notStartedCount >= 5) {
-          // Sessão Blazor nunca foi iniciada (provavelmente falha no servidor)
-          indicator.classList.remove('show');
-          return;
-        }
+        if (notStartedCount >= 5) { indicator.classList.remove('show'); return; }
         if (indText) indText.textContent = 'Aguardando início da preparação...';
         continue;
       }
-      // status === 'preparing'
       notStartedCount = 0;
       if (indText) indText.textContent = `Preparando PDF em background... (${tries}s)`;
-    } catch { /* ignora erros de rede durante polling */ }
+    } catch {}
   }
-  // Timeout — esconde o indicador silenciosamente
   if (indicator) indicator.classList.remove('show');
 }
 
@@ -1629,7 +1354,7 @@ async function downloadPDF() {
 
   const data      = STATE.currentResult;
   const pedido    = STATE.currentPedido;
-  const feitoPor  = STATE.currentFeitoPor;
+  const feitoPor  = STATE.currentFeitoPor || DEFAULT_FEITO_POR;
   const orders    = data?.orders ?? [];
   const nome      = data?.person?.currentPersonName || data?.hashResult?.personName || 'DESCONHECIDO';
   const rawDoc    = (data?.person?.documentNumber || '').replace(/\D/g,'');
@@ -1642,7 +1367,6 @@ async function downloadPDF() {
   if (feitoPor) parts.push(`Feito por ${feitoPor}`);
   const filename = parts.join(' - ') + '.pdf';
 
-  // ── MODO CLONE ──────────────────────────────────────────
   if (STATE.pdfMode === 'clone') {
     btn.classList.add('loading'); btn.disabled = true;
     try {
@@ -1653,21 +1377,16 @@ async function downloadPDF() {
     return;
   }
 
-  // ── MODO OFICIAL COM TIMEOUT DINÂMICO + FALLBACK PARA CLONE ──
   btn.classList.add('loading'); btn.disabled = true;
   const indicator = document.getElementById('pdf-indicator');
   const timeoutMs = orders.length > 10 ? 15000 : 7000;
 
   try {
-    // Estratégia: Promise.race entre fetch do PDF oficial e fallback
     const oficialPromise = fetch('/api/pdf', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({cookies})
     }).then(async res => {
-      if (res.status === 401) {
-        sessaoExpirada();
-        throw new Error('SESSION_EXPIRED');
-      }
+      if (res.status === 401) { sessaoExpirada(); throw new Error('SESSION_EXPIRED'); }
       if (!res.ok) throw new Error('HTTP_' + res.status);
       return await res.blob();
     });
@@ -1677,45 +1396,33 @@ async function downloadPDF() {
     );
 
     try {
-      // Tenta Oficial dentro do timeout dinâmico
       const blob = await Promise.race([oficialPromise, timeoutPromise]);
-      
-      // Sucesso — salva/baixa o PDF
       if (indicator) {
         indicator.classList.add('done');
         indicator.querySelector('.pi-spin').style.display='none';
         const t = indicator.querySelector('#pdf-indicator-text');
         if (t) t.textContent = 'Gerando Certidão...';
       }
-      
       await savePDFBlob(blob, filename, 'Certidão PDF salvo');
     } catch (timeoutErr) {
-      // Oficial falhou ou demorou — tenta Clone como fallback
       if (timeoutErr.message === 'SESSION_EXPIRED') throw timeoutErr;
-      
       if (indicator) {
         indicator.classList.add('done');
         indicator.querySelector('.pi-spin').style.display='none';
         const t = indicator.querySelector('#pdf-indicator-text');
         if (t) t.textContent = 'PDF Oficial indisponível, gerando Clone...';
       }
-      
       await generateClonePDFAndSave(data, rawDoc, pedido, feitoPor, filename);
     }
   } catch (err) {
-    if (err.message === 'SESSION_EXPIRED') {
-      setTimeout(sessaoExpirada, 100);
-      return;
-    }
+    if (err.message === 'SESSION_EXPIRED') { setTimeout(sessaoExpirada, 100); return; }
     showMsg('msg-pesquisa','Erro ao gerar PDF. Tente novamente.','error');
   } finally {
     btn.classList.remove('loading'); btn.disabled = false;
   }
 }
 
-// ── SALVAR BLOB DE PDF ──────────────────────────────────────
 async function savePDFBlob(blob, filename, successMsg='PDF salvo') {
-  // Feature: salva direto na pasta se definida
   if (STATE.singleFolderHandle) {
     try {
       const fileHandle = await STATE.singleFolderHandle.getFileHandle(filename, {create:true});
@@ -1729,21 +1436,15 @@ async function savePDFBlob(blob, filename, successMsg='PDF salvo') {
         if (t) t.textContent = `${successMsg} em "${STATE.singleFolderHandle.name}"`;
       }
       return;
-    } catch {
-      // Falhou ao salvar na pasta — cai no download normal
-    }
+    } catch {}
   }
-
-  // Download normal pelo navegador
   const url = URL.createObjectURL(blob);
   const a   = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-
   try { await navigator.clipboard.writeText(filename); } catch {}
-
   const indicator = document.getElementById('pdf-indicator');
   if (indicator) {
     const t = indicator.querySelector('#pdf-indicator-text');
@@ -1751,30 +1452,10 @@ async function savePDFBlob(blob, filename, successMsg='PDF salvo') {
   }
 }
 
-// ── ORDER CARDS ────────────────────────────────────────────
-function renderOrderCards(orders, mode) {
+// ── FIX #4: ORDER CARDS — full-width row layout ────────────
+function renderOrderCards(orders) {
   const sorted = [...orders].sort((a,b) => new Date(b.createdOn||0) - new Date(a.createdOn||0));
-  if (mode === 'normal') return sorted.map((o,i) => orderCardHTML(o,i)).join('');
-
-  const groups = {}, singles = [];
-  sorted.forEach(o => {
-    const pn = (o.processNumber||'').trim();
-    if (!pn) { singles.push(o); return; }
-    if (!groups[pn]) groups[pn] = [];
-    groups[pn].push(o);
-  });
-  Object.entries(groups).forEach(([pn,arr]) => { if (arr.length===1) { singles.push(arr[0]); delete groups[pn]; } });
-
-  let html = ''; let idx = 0;
-  Object.entries(groups).forEach(([pn,arr]) => {
-    html += `<div class="group-header-row"><div class="group-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Processo ${esc(pn)}<span class="group-count">${arr.length}</span></div></div>`;
-    arr.forEach(o => { html += orderCardHTML(o, idx++); });
-  });
-  if (singles.length) {
-    html += `<div class="group-header-row"><div class="group-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Processos individuais<span class="group-count">${singles.length}</span></div></div>`;
-    singles.forEach(o => { html += orderCardHTML(o, idx++); });
-  }
-  return html;
+  return sorted.map((o,i) => orderCardHTML(o,i)).join('');
 }
 
 function orderCardHTML(o, idx) {
@@ -1782,23 +1463,30 @@ function orderCardHTML(o, idx) {
     ? new Date(o.createdOn).toLocaleString('pt-BR') : '—';
   return `<div class="order-card">
     <div class="order-card-top">
-      <div style="min-width:0;flex:1;"><div class="protocol-lbl">Protocolo</div><div class="protocol-val">${esc(o.protocol||'—')}</div></div>
-      <div style="flex-shrink:0;text-align:right;"><div class="date-lbl">Data</div><div class="date-val">${dateFmt}</div></div>
+      <div>
+        <div class="protocol-lbl">Protocolo</div>
+        <div class="protocol-val">${esc(o.protocol||'—')}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div class="date-lbl">Data</div>
+        <div class="date-val">${dateFmt}</div>
+      </div>
     </div>
     <div class="order-card-body">
-      <div><div class="ofield-lbl">Processo</div><div class="ofield-val">${esc(o.processNumber||'—')}</div></div>
-      <div><div class="ofield-lbl">Ação</div><div class="ofield-val">${esc(o.processName||'—')}</div></div>
-      <div><div class="ofield-lbl">Órgão Emissor</div><div class="ofield-val">${esc(o.organizationLabel||'—')}</div></div>
+      <div>
+        <div class="ofield-lbl">Número do Processo</div>
+        <div class="ofield-val">${esc(o.processNumber||'—')}</div>
+      </div>
+      <div>
+        <div class="ofield-lbl">Tipo</div>
+        <div class="ofield-val">${esc(o.processName||'—')}</div>
+      </div>
+      <div class="ofield-emissor">
+        <div class="ofield-lbl">Emissor da Ordem</div>
+        <div class="ofield-val">${esc(o.organizationLabel||'—')}</div>
+      </div>
     </div>
   </div>`;
-}
-
-function setViewMode(mode) {
-  STATE.viewMode = mode;
-  document.getElementById('vt-normal')?.classList.toggle('active', mode==='normal');
-  document.getElementById('vt-grouped')?.classList.toggle('active', mode==='grouped');
-  const grid = document.getElementById('orders-grid');
-  if (grid && STATE.currentResult) grid.innerHTML = renderOrderCards(STATE.currentResult.orders||[], mode);
 }
 
 // ── MULTI SEARCH ───────────────────────────────────────────
@@ -1860,8 +1548,8 @@ async function selectFolder() {
 async function mlRun() {
   if (STATE.mlRunning) return;
   if (!STATE.mlQueue.length) { showMsg('msg-ml','Adicione itens antes de iniciar.','warn'); return; }
-  const feitoPor = document.getElementById('ml-feito-por').value.trim();
-  if (!feitoPor) { showMsg('msg-ml','Informe o operador responsável.','error'); return; }
+  // FIX #1: use default if empty
+  const feitoPor = getFeitoPor('ml-feito-por');
   if (!STATE.selectedFolderHandle) { showMsg('msg-ml','Selecione a pasta de destino.','warn'); return; }
   const cookies = localStorage.getItem('onr_cookies');
   if (!cookies) { sessaoExpirada(); return; }
@@ -1875,16 +1563,13 @@ async function mlRun() {
   const pt = document.getElementById('ml-progress-text');
   pw.classList.add('show'); pt.style.display='block';
 
-  // Captura a fila ANTES de limpar (para processar)
   const fila = [...STATE.mlQueue];
   const total = fila.length;
   let done = 0;
 
-  // ── LIMPA A FILA IMEDIATAMENTE ao iniciar ──
   STATE.mlQueue = [];
   renderMLQueue();
 
-  // Mostra fila de execução separada (read-only durante execução)
   const execQueue = document.getElementById('ml-queue');
   execQueue.innerHTML = fila.map(item => `
     <div class="queue-item" id="qi-exec-${item.id}">
@@ -1895,7 +1580,6 @@ async function mlRun() {
     </div>`).join('');
 
   for (const item of fila) {
-    // Atualiza status na fila de execução
     const statusEl = document.getElementById(`qs-exec-${item.id}`);
     if (statusEl) { statusEl.className='queue-status running'; statusEl.textContent='Processando...'; }
 
@@ -1915,21 +1599,16 @@ async function mlRun() {
       const resultado = orders.length>0 ? 'CNIB POSITIVO' : 'CNIB NEGATIVO';
       const isPos     = orders.length > 0;
 
-      // Atualiza nome na fila de execução
       const nomeEl = document.getElementById(`qn-exec-${item.id}`);
       if (nomeEl) nomeEl.textContent = nomeAPI;
-      // Marca resultado da busca (Positivo/Negativo) mas ainda não é o estado final
       if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
 
-      // Aguarda sessão Blazor estar pronta para o PDF (o /api/consultar já disparou em background)
       try {
-        // Avisa o usuário que o PDF está sendo gerado
         if (statusEl) {
           statusEl.className = 'queue-status gerando-pdf';
           statusEl.innerHTML = '<span class="qs-spin"></span>Gerando PDF...';
         }
 
-        // Polling no status até ficar ready (max 35s)
         let pdfReady = false;
         for (let t=0; t<35; t++) {
           await delay(1000);
@@ -1953,10 +1632,8 @@ async function mlRun() {
           }
         }
 
-        // Restaura badge de resultado após PDF (com ou sem sucesso)
         if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
       } catch {
-        // PDF falhou — restaura badge de resultado mesmo assim
         if (statusEl) { statusEl.className=`queue-status ${isPos?'done-pos':'done-neg'}`; statusEl.textContent=isPos?'⚠ Positivo':'✓ Negativo'; }
       }
 
@@ -1975,7 +1652,6 @@ async function mlRun() {
   setBtnLoading('btn-ml-run', false);
   showMsg('msg-ml',`Lote concluído: ${done} pesquisa${done!==1?'s':''} processada${done!==1?'s':''}.`,'success');
 
-  // Após 3s limpa a fila de execução exibida para nova adição
   setTimeout(() => {
     if (!STATE.mlRunning) {
       execQueue.innerHTML = '';
@@ -1993,7 +1669,7 @@ const HIST_TTL = 8 * 60 * 60 * 1000;
 function addHistory(doc, data, pedido='', feitoPor='') {
   const nome   = data.person?.currentPersonName || data.hashResult?.personName || 'Desconhecido';
   const orders = data.orders||[];
-  STATE.history.unshift({ id:Date.now(), doc, nome, pedido, feitoPor, result:data, positive:orders.length>0, time:Date.now() });
+  STATE.history.unshift({ id:Date.now(), doc, nome, pedido, feitoPor: feitoPor||DEFAULT_FEITO_POR, result:data, positive:orders.length>0, time:Date.now() });
   persistHistory();
   updateHistBadge();
 }
@@ -2044,12 +1720,13 @@ function openHistModal(id) {
   const body = document.getElementById('modal-body');
   const orders = h.result?.orders||[];
   const isNeg  = orders.length===0;
+  const feitoPorDisplay = h.feitoPor || DEFAULT_FEITO_POR;
   let html = `<div style="margin-bottom:20px;">
     <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;justify-content:space-between;">
       <div>
         <div class="person-name" style="font-size:20px;">${esc(h.nome)}</div>
         <div class="person-doc">${esc(h.doc)}</div>
-        ${h.pedido?`<div style="font-size:11px;color:var(--text-3);margin-top:4px;">Pedido #${esc(h.pedido)}${h.feitoPor?` · Feito por ${esc(h.feitoPor)}`:''}</div>`:''}
+        ${h.pedido?`<div style="font-size:11px;color:var(--text-3);margin-top:4px;">Pedido #${esc(h.pedido)} · Feito por ${esc(feitoPorDisplay)}</div>`:`<div style="font-size:11px;color:var(--text-3);margin-top:4px;">Feito por ${esc(feitoPorDisplay)}</div>`}
       </div>
       <div class="verdict ${isNeg?'neg':'pos'}"><span class="v-dot"></span>${isNeg?'Negativo':'Positivo'}</div>
     </div>
@@ -2057,8 +1734,9 @@ function openHistModal(id) {
   if (isNeg) {
     html += `<div class="result-negative"><div style="display:flex;align-items:center;gap:14px;"><div class="check-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div style="font-size:14px;font-weight:500;color:var(--text);">Nenhuma indisponibilidade encontrada</div></div><div class="neg-msg">Nenhuma indisponibilidade para este documento no momento da consulta.</div></div>`;
   } else {
-    html += `<div style="font-size:13px;color:var(--text-3);margin-bottom:2px;">${orders.length} indisponibilidade${orders.length>1?'s':''}</div>
-    <div class="modal-orders-grid">${orders.sort((a,b)=>new Date(b.createdOn||0)-new Date(a.createdOn||0)).map((o,i)=>orderCardHTML(o,i)).join('')}</div>`;
+    // FIX #4: modal also uses full-width list
+    html += `<div style="font-size:13px;color:var(--text-3);margin-bottom:8px;">${orders.length} indisponibilidade${orders.length>1?'s':''}</div>
+    <div class="modal-orders-list">${renderOrderCards(orders)}</div>`;
   }
   body.innerHTML = html;
   document.getElementById('modal-overlay').classList.add('show');
@@ -2089,7 +1767,6 @@ async function loginComCertificado() {
   hideMsg('msg-auth');
 
   try {
-    // 1. Pede à VPS para criar uma sessão de login
     const r = await fetch('/api/cert-login/start', { method: 'POST' });
     const d = await r.json();
 
@@ -2100,16 +1777,10 @@ async function loginComCertificado() {
     }
 
     _certSessionId = d.sessionId;
-    console.log('[LOGIN CERT] Sessão criada:', _certSessionId);
-
-    // 2. Mostra modal com instrução para rodar o agente
     _abrirCertModal();
-
-    // 3. Inicia polling aguardando o agente enviar os cookies (polling mais frequente)
-    _certPollInterval = setInterval(_verificarStatusCert, 1500); // Reduzido de 2500ms para 1500ms
+    _certPollInterval = setInterval(_verificarStatusCert, 1500);
 
   } catch (err) {
-    console.error('[LOGIN CERT] Erro ao conectar:', err);
     showMsg('msg-auth', 'Erro ao conectar com o servidor.', 'error');
     _resetCertBtn();
   }
@@ -2118,10 +1789,10 @@ async function loginComCertificado() {
 function _abrirCertModal() {
   const overlay = document.getElementById('cert-modal-overlay');
   const modal   = document.getElementById('cert-modal');
-  const host    = window.location.host; // ex: cnib.jumoreira.online
+  const host    = window.location.host;
   const proto   = `cnib://${_certSessionId}@${host}`;
 
-  modal.classList.remove('waiting'); // começa sem spinner — mostra instrução primeiro
+  modal.classList.remove('waiting');
   document.getElementById('cert-modal-title').textContent = 'Autenticar com Certificado';
   document.getElementById('cert-modal-desc').innerHTML =
     'Clique no botão abaixo para abrir o agente CNIB na sua máquina e autenticar com o token.';
@@ -2133,8 +1804,7 @@ function _abrirCertModal() {
          style="display:inline-flex;align-items:center;gap:10px;
                 padding:13px 24px;border-radius:10px;
                 background:var(--blue);color:#fff;font-weight:600;
-                font-size:14px;text-decoration:none;border:none;cursor:pointer;
-                transition:opacity .2s;">
+                font-size:14px;text-decoration:none;border:none;cursor:pointer;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
@@ -2142,12 +1812,7 @@ function _abrirCertModal() {
       </a>
     </div>
     <div id="cert-setup-hint" style="font-size:11px;color:var(--text-3);text-align:center;margin-top:10px;">
-      Primeira vez? 
-      <a href="/cnib-agent-setup.zip" download
-         style="color:var(--blue);text-decoration:underline;">
-        Baixe e configure o agente
-      </a>
-      (uma vez só)
+      Primeira vez? <a href="/cnib-agent-setup.zip" download style="color:var(--blue);text-decoration:underline;">Baixe e configure o agente</a> (uma vez só)
     </div>
     <div class="cert-step" style="margin-top:12px;">
       <div class="cert-step-num">1</div>
@@ -2172,36 +1837,25 @@ function _abrirCertModal() {
   overlay.classList.add('show');
 }
 
-// Chamado após o usuário clicar no link cnib:// — ativa o spinner e polling
 function _aguardarAgente() {
   const modal = document.getElementById('cert-modal');
   modal.classList.add('waiting');
   document.getElementById('cert-modal-status').textContent = 'Aguardando autenticação...';
-  console.log('[CERT MODAL] Ativando polling para agente...');
   if (!_certPollInterval) {
-    _certPollInterval = setInterval(_verificarStatusCert, 1500); // Frequência aumentada
+    _certPollInterval = setInterval(_verificarStatusCert, 1500);
   }
 }
 
 async function _verificarStatusCert() {
   if (!_certSessionId) return;
   try {
-    const r = await fetch(`/api/cert-login/status?sessionId=${_certSessionId}`, {
-      timeout: 5000
-    });
+    const r = await fetch(`/api/cert-login/status?sessionId=${_certSessionId}`);
     const d = await r.json();
     const statusEl = document.getElementById('cert-modal-status');
 
-    if (!r.ok) {
-      console.error('[CERT POLLING] Erro no servidor:', r.status, d);
-      if (statusEl) statusEl.textContent = 'Erro ao conectar com o servidor...';
-      return;
-    }
-
-    console.log('[CERT POLLING] Status:', d.status, '| Cookies:', !!d.cookies);
+    if (!r.ok) { if (statusEl) statusEl.textContent = 'Erro ao conectar com o servidor...'; return; }
 
     if (d.status === 'done' && d.cookies) {
-      console.log('[CERT POLLING] ✓ Cookies recebidos! Validando...');
       clearInterval(_certPollInterval);
       _certPollInterval = null;
 
@@ -2218,52 +1872,36 @@ async function _verificarStatusCert() {
         const vd = await vr.json();
 
         if (vr.ok && vd.sucesso) {
-          console.log('[CERT LOGIN] ✓ Autenticação bem-sucedida!');
           localStorage.setItem('onr_cookies', d.cookies);
-          
-          // Aguarda um pouco para a UI ser confortável antes de fechar
           await new Promise(r => setTimeout(r, 800));
-          
           document.getElementById('cert-modal-overlay').classList.remove('show');
           document.getElementById('cert-modal').classList.remove('waiting');
           _certSessionId = null;
           _resetCertBtn();
           setAuthenticated(true);
         } else {
-          console.error('[CERT LOGIN] ✗ Validação falhou:', vd);
           _certModalErro('Sessão capturada, mas o ONR recusou os cookies. Tente novamente.');
         }
-      } catch (validErr) {
-        console.error('[CERT LOGIN] ✗ Erro ao validar:', validErr);
+      } catch {
         _certModalErro('Erro ao validar sessão. Tente novamente.');
       }
 
     } else if (d.status === 'timeout' || d.status === 'expired') {
-      console.warn('[CERT POLLING] Sessão expirada:', d.status);
       clearInterval(_certPollInterval);
       _certPollInterval = null;
       _certSessionId = null;
       _certModalErro('Tempo esgotado (5 minutos). Clique em fechar e tente novamente.');
-
     } else if (d.status === 'waiting') {
       const dots = ['Aguardando o agente', 'Aguardando o agente.', 'Aguardando o agente..', 'Aguardando o agente...'];
-      const msg = dots[Math.floor(Date.now() / 700) % 4];
-      if (statusEl) statusEl.textContent = msg;
+      if (statusEl) statusEl.textContent = dots[Math.floor(Date.now() / 700) % 4];
     }
-
-  } catch (err) {
-    console.error('[CERT POLLING] Erro na requisição:', err);
-    // Ignora erros de rede passageiros no polling
-  }
+  } catch {}
 }
 
 function _certModalErro(msg) {
-  console.error('[CERT ERROR]', msg);
   clearInterval(_certPollInterval);
   _certPollInterval = null;
-  
-  const modal   = document.getElementById('cert-modal');
-  const overlay = document.getElementById('cert-modal-overlay');
+  const modal = document.getElementById('cert-modal');
   modal.classList.remove('waiting');
   document.getElementById('cert-modal-title').textContent = 'Falha na autenticação';
   document.getElementById('cert-modal-desc').textContent  = msg;
@@ -2275,16 +1913,13 @@ function _certModalErro(msg) {
 async function cancelarLoginCertificado() {
   clearInterval(_certPollInterval);
   _certPollInterval = null;
-
   if (_certSessionId) {
     fetch('/api/cert-login/cancel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: _certSessionId })
     }).catch(() => {});
     _certSessionId = null;
   }
-
   document.getElementById('cert-modal-overlay').classList.remove('show');
   document.getElementById('cert-modal').classList.remove('waiting');
   document.getElementById('btn-cert-cancel').textContent = 'Cancelar';
@@ -2293,15 +1928,8 @@ async function cancelarLoginCertificado() {
 
 function _resetCertBtn() {
   const btn = document.getElementById('btn-cert-login');
-  if (btn) { 
-    btn.disabled = false; 
-    btn.classList.remove('loading'); 
-  }
-  // Garante que o polling seja parado mesmo se houver erro
-  if (_certPollInterval) {
-    clearInterval(_certPollInterval);
-    _certPollInterval = null;
-  }
+  if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  if (_certPollInterval) { clearInterval(_certPollInterval); _certPollInterval = null; }
 }
 
 // ── UTILS ──────────────────────────────────────────────────

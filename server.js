@@ -17,19 +17,16 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ═══════════════════════════════════════════════════════════
-// PUPPETEER POOL — reutiliza uma única instância do browser
-// evita abrir/fechar Chrome a cada pesquisa (economiza ~150MB por sessão)
+// PUPPETEER POOL
 // ═══════════════════════════════════════════════════════════
 let sharedBrowser = null;
-let browserPending = null;   // Promise em andamento durante a criação
+let browserPending = null;
 let browserUseCount = 0;
-const BROWSER_RECYCLE_AFTER = 20; // recicla o browser a cada 20 usos
+const BROWSER_RECYCLE_AFTER = 20;
 
 async function getBrowser() {
-    // Se já tem browser vivo, retorna ele
     if (sharedBrowser) {
         try {
-            // Verifica se ainda está vivo
             await sharedBrowser.version();
             if (browserUseCount >= BROWSER_RECYCLE_AFTER) {
                 console.log('[POOL] Reciclando browser após', browserUseCount, 'usos');
@@ -44,7 +41,6 @@ async function getBrowser() {
         }
     }
 
-    // Se já tem uma criação em andamento, aguarda ela
     if (browserPending) return browserPending;
 
     browserPending = (async () => {
@@ -59,7 +55,7 @@ async function getBrowser() {
                 '--disable-software-rasterizer',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process',           // economiza RAM significativamente
+                '--single-process',
                 '--disable-extensions',
                 '--disable-background-networking',
                 '--disable-default-apps',
@@ -76,7 +72,6 @@ async function getBrowser() {
         sharedBrowser = browser;
         browserPending = null;
 
-        // Se o browser cair inesperadamente, limpa referência
         browser.on('disconnected', () => {
             console.log('[POOL] Browser desconectado');
             sharedBrowser = null;
@@ -89,7 +84,7 @@ async function getBrowser() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// FUNÇÃO ORIGINAL — não alterada
+// FUNÇÃO ORIGINAL
 // ═══════════════════════════════════════════════════════════
 async function requestONR(documento, cookieString) {
     const form = new FormData();
@@ -128,7 +123,7 @@ async function requestONR(documento, cookieString) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SESSÃO BLAZOR — controla o Puppeteer em background
+// SESSÃO BLAZOR
 // ═══════════════════════════════════════════════════════════
 const blazorSessions = new Map();
 
@@ -158,14 +153,11 @@ async function popularSessaoBlazor(documento, cookieString) {
                 console.error('  → Mensagem:', launchErr.message);
                 if (launchErr.message.includes('Could not find') || launchErr.message.includes('No usable sandbox')) {
                     console.error('  → CAUSA PROVÁVEL: Chrome/Chromium não está instalado.');
-                    console.error('  → SOLUÇÃO: Execute "npx puppeteer browsers install chrome" ou instale o Chromium:');
-                    console.error('             sudo apt-get install -y chromium-browser');
+                    console.error('  → SOLUÇÃO: Execute "npx puppeteer browsers install chrome"');
                 } else if (launchErr.message.includes('EACCES') || launchErr.message.includes('permission')) {
                     console.error('  → CAUSA PROVÁVEL: Permissão negada ao executável do Chrome.');
-                    console.error('  → SOLUÇÃO: chmod +x no binário do Chrome, ou rode sem --no-sandbox com cautela.');
                 } else if (launchErr.message.includes('ENOMEM') || launchErr.message.includes('out of memory')) {
                     console.error('  → CAUSA PROVÁVEL: Memória insuficiente no servidor.');
-                    console.error('  → SOLUÇÃO: Aumente a RAM ou reduza BROWSER_RECYCLE_AFTER.');
                 } else {
                     console.error('  → Stack:', launchErr.stack);
                 }
@@ -175,7 +167,6 @@ async function popularSessaoBlazor(documento, cookieString) {
 
             page = await browser.newPage();
 
-            // Bloqueia recursos desnecessários para economizar RAM e acelerar
             await page.setRequestInterception(true);
             page.on('request', req => {
                 const t = req.resourceType();
@@ -183,7 +174,6 @@ async function popularSessaoBlazor(documento, cookieString) {
                 else req.continue();
             });
 
-            // Viewport mínimo
             await page.setViewport({ width: 1024, height: 768 });
 
             const cookieArray = cookieString.split('; ').map(c => {
@@ -195,39 +185,19 @@ async function popularSessaoBlazor(documento, cookieString) {
 
             await page.setCookie(...cookieArray);
 
-            let gotoOk = false;
             try {
                 await page.goto(
                     'https://indisponibilidade.onr.org.br/ordem/consulta/simplificada',
                     { waitUntil: 'networkidle2', timeout: 45000 }
                 );
-                gotoOk = true;
             } catch (navErr) {
-                console.error('[BLAZOR] ✗ FALHA AO NAVEGAR PARA A PÁGINA:');
-                console.error('  → Mensagem:', navErr.message);
-                if (navErr.message.includes('net::ERR_NAME_NOT_RESOLVED') || navErr.message.includes('getaddrinfo')) {
-                    console.error('  → CAUSA PROVÁVEL: Sem acesso à internet ou DNS falhou.');
-                    console.error('  → SOLUÇÃO: Verifique a conectividade do servidor VPS com curl https://indisponibilidade.onr.org.br');
-                } else if (navErr.message.includes('net::ERR_CONNECTION_REFUSED')) {
-                    console.error('  → CAUSA PROVÁVEL: Servidor ONR recusou a conexão.');
-                } else if (navErr.message.includes('timeout')) {
-                    console.error('  → CAUSA PROVÁVEL: Timeout ao carregar a página (networkidle2 > 45s).');
-                    console.error('  → SOLUÇÃO: Tente aumentar o timeout ou checar a latência da VPS com o ONR.');
-                } else if (navErr.message.includes('net::ERR_CERT') || navErr.message.includes('SSL')) {
-                    console.error('  → CAUSA PROVÁVEL: Problema de certificado SSL.');
-                    console.error('  → SOLUÇÃO: Adicione --ignore-certificate-errors nos args do Puppeteer (temporário).');
-                }
+                console.error('[BLAZOR] ✗ FALHA AO NAVEGAR PARA A PÁGINA:', navErr.message);
                 throw navErr;
             }
 
-            // Verifica se o cookie foi aceito (página pode redirecionar p/ login)
             const currentUrl = page.url();
             if (!currentUrl.includes('/ordem/consulta')) {
-                const pageTitle = await page.title().catch(() => '?');
                 console.error(`[BLAZOR] ✗ REDIRECIONADO PARA URL INESPERADA: ${currentUrl}`);
-                console.error(`  → Título da página: "${pageTitle}"`);
-                console.error('  → CAUSA PROVÁVEL: Cookie expirado ou rejeitado pelo ONR (sessão inválida).');
-                console.error('  → SOLUÇÃO: Renove o cookie no Publisher ou via EditThisCookie.');
                 throw new Error(`Redirecionado para ${currentUrl} — cookie pode estar inválido`);
             }
             console.log('[BLAZOR] Página carregada');
@@ -258,10 +228,7 @@ async function popularSessaoBlazor(documento, cookieString) {
             }
 
             if (!inputHandle) {
-                console.error('[BLAZOR] ✗ CAMPO CPF/CNPJ NÃO ENCONTRADO NA PÁGINA:');
-                console.error('  → Inputs encontrados:', JSON.stringify(inputsInfo));
-                console.error('  → CAUSA PROVÁVEL: ONR mudou o layout da página, ou a sessão foi redirecionada.');
-                console.error('  → SOLUÇÃO: Inspecione a URL atual e o HTML da página via Puppeteer para atualizar os seletores.');
+                console.error('[BLAZOR] ✗ CAMPO CPF/CNPJ NÃO ENCONTRADO NA PÁGINA');
                 throw new Error('Campo CPF/CNPJ não encontrado na página');
             }
 
@@ -307,7 +274,6 @@ async function popularSessaoBlazor(documento, cookieString) {
             blazorSessions.set(key, { promise, status: 'error', resolveFn, rejectFn });
             rejectFn(err);
         } finally {
-            // Fecha apenas a PAGE, não o browser — reutilizamos o browser
             if (page) await page.close().catch(() => {});
         }
     })();
@@ -427,7 +393,6 @@ app.post('/api/pdf', async (req, res) => {
             return res.send(buffer);
         }
 
-        // Não é PDF — tenta entender o que voltou
         const text = buffer.toString('utf8').slice(0, 800);
         console.error('[PDF] ✗ RESPOSTA NÃO É UM PDF:');
         console.error(`  → HTTP Status: ${pdfRes.status}`);
@@ -438,26 +403,19 @@ app.post('/api/pdf', async (req, res) => {
         if (pdfRes.status === 302 || (contentType.includes('text/html') && text.toLowerCase().includes('<html'))) {
             const hasLoginKeyword = text.toLowerCase().includes('login') || text.toLowerCase().includes('entrar') || text.toLowerCase().includes('senha');
             if (hasLoginKeyword) {
-                console.error('  → CAUSA PROVÁVEL: Cookie expirado. ONR redirecionou para a tela de login.');
-                console.error('  → SOLUÇÃO: Renove a sessão no Publisher ou cole um novo cookie.');
                 return res.status(401).json({ erro: 'Sessão expirada. Faça login novamente e refaça a pesquisa.' });
             }
-            console.error('  → CAUSA PROVÁVEL: Sessão Blazor não foi populada corretamente (página não fez a consulta).');
-            console.error('  → SOLUÇÃO: Refaça a pesquisa do documento e aguarde o indicador "PDF pronto" antes de baixar.');
             return res.status(500).json({ erro: 'PDF não gerado: sessão não estava preparada. Refaça a pesquisa.' });
         }
 
         if (text.includes('erro ao gerar') || text.includes('Verifique os parametros') || text.includes('Ocorreu um erro')) {
-            console.error('  → CAUSA PROVÁVEL: ONR retornou mensagem de erro explícita no corpo da resposta.');
             return res.status(500).json({ erro: 'ONR retornou erro ao gerar o relatório. Refaça a pesquisa.' });
         }
 
         if (buffer.length < 500) {
-            console.error('  → CAUSA PROVÁVEL: Resposta muito pequena — pode ser uma resposta vazia ou de sessão inválida.');
             return res.status(500).json({ erro: `Resposta inválida do ONR (${buffer.length} bytes). Refaça a pesquisa.` });
         }
 
-        console.error('  → CAUSA DESCONHECIDA. Verifique o log acima para mais detalhes.');
         return res.status(500).json({ erro: `PDF não reconhecido (${buffer.length} bytes). Veja o log do servidor.` });
 
     } catch (err) {
@@ -466,8 +424,11 @@ app.post('/api/pdf', async (req, res) => {
     }
 });
 
-// ── POST /api/pdf-clone ────────────────────────────────────────
-// Gera PDF Clone via Puppeteer - monta HTML correto do CNIB e gera PDF
+// ═══════════════════════════════════════════════════════════
+// FIX #3: PDF CLONE — layout corrigido para indisponibilidades
+// Cada indisponibilidade em bloco próprio, campos empilhados,
+// sem corte entre páginas, emissor completo sem truncar.
+// ═══════════════════════════════════════════════════════════
 app.post('/api/pdf-clone', async (req, res) => {
     const { cookies, documento, responsavelNome, responsavelCPF, orders, nomeAlvo, statusTexto } = req.body;
     if (!cookies) return res.status(400).json({ erro: 'Cookies não informados.' });
@@ -483,115 +444,323 @@ app.post('/api/pdf-clone', async (req, res) => {
         const browser = await getBrowser();
         page = await browser.newPage();
 
-        // Formatar documento
-        const docRaw = documento.replace(/\D/g, '');
+        // ── Formatar documento ────────────────────────────
+        const docRaw = (documento || '').replace(/\D/g, '');
         let docFormatted = docRaw;
         if (docRaw.length === 11) {
             docFormatted = docRaw.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
         } else if (docRaw.length === 14) {
+            // CNPJ sem barra para o PDF (igual ao PDF oficial)
             docFormatted = docRaw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3.$4-$5');
         }
 
-        // Escape HTML
+        // ── Escape HTML ───────────────────────────────────
         const h = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const hMultiline = s => h(s).replace(/\r?\n/g, '<br>');
 
-        // Dados padrão
-        const ordersArray = orders || [];
-        const isNeg = ordersArray.length === 0;
-        const status = statusTexto || (isNeg ? 'NEGATIVO' : 'POSITIVO');
-        const dataHora = new Date().toLocaleString('pt-BR');
-        const hash = 'vzkkait5zq';
-        const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://indisponibilidade.onr.org.br/home/validar';
-        const iconNegative = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>';
-        
-        // Carrega imagens como Base64 para Puppeteer
+        // ── Dados ─────────────────────────────────────────
+        const ordersArray  = Array.isArray(orders) ? orders : [];
+        const isNeg        = ordersArray.length === 0;
+        const status       = statusTexto || (isNeg ? 'NEGATIVO' : 'POSITIVO');
+        const dataHora     = new Date().toLocaleString('pt-BR');
+        const hash         = 'vzkkait5zq';
+        const qrUrl        = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://indisponibilidade.onr.org.br/home/validar';
+
+        // ── Carrega logos como Base64 ─────────────────────
         const assetsDir = path.join(__dirname, 'public', 'assets');
         let imgCnibBase64 = '';
-        let imgOnrBase64 = '';
-        
+        let imgOnrBase64  = '';
+
         try {
-            const cnibImagePath = path.join(assetsDir, 'CNIB-EXTENSO-AZUL.png');
-            const onrImagePath = path.join(assetsDir, 'logo-onr-novo.png');
-            
-            if (fs.existsSync(cnibImagePath)) {
-                const cnibData = fs.readFileSync(cnibImagePath);
-                imgCnibBase64 = 'data:image/png;base64,' + cnibData.toString('base64');
-                console.log(`[PDF-CLONE] ✓ Imagem CNIB carregada (${cnibData.length} bytes)`);
-            } else {
-                console.warn(`[PDF-CLONE] ⚠ Arquivo CNIB não encontrado: ${cnibImagePath}`);
+            const cnibPath = path.join(assetsDir, 'CNIB-EXTENSO-AZUL.png');
+            const onrPath  = path.join(assetsDir, 'logo-onr-novo.png');
+            if (fs.existsSync(cnibPath)) {
+                imgCnibBase64 = 'data:image/png;base64,' + fs.readFileSync(cnibPath).toString('base64');
+                console.log('[PDF-CLONE] ✓ Logo CNIB carregada');
             }
-            
-            if (fs.existsSync(onrImagePath)) {
-                const onrData = fs.readFileSync(onrImagePath);
-                imgOnrBase64 = 'data:image/png;base64,' + onrData.toString('base64');
-                console.log(`[PDF-CLONE] ✓ Imagem ONR carregada (${onrData.length} bytes)`);
-            } else {
-                console.warn(`[PDF-CLONE] ⚠ Arquivo ONR não encontrado: ${onrImagePath}`);
+            if (fs.existsSync(onrPath)) {
+                imgOnrBase64 = 'data:image/png;base64,' + fs.readFileSync(onrPath).toString('base64');
+                console.log('[PDF-CLONE] ✓ Logo ONR carregada');
             }
         } catch (imgErr) {
-            console.error(`[PDF-CLONE] Erro ao carregar imagens: ${imgErr.message}`);
+            console.warn('[PDF-CLONE] ⚠ Erro ao carregar logos:', imgErr.message);
         }
 
-        // HTML dos resultados
+        // ── Ícone de resultado negativo (X em documento) ──
+        const iconNegative = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"
+            fill="currentColor" viewBox="0 0 16 16">
+            <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14
+            4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0
+            1-1V4.5h-2z"/>
+            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708
+            L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0
+            1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+        </svg>`;
+
+        // ── Bloco de resultado ────────────────────────────
         let htmlRes = '';
+
         if (isNeg) {
-            htmlRes = '<div class="result-container"><div class="result-icon">' + iconNegative + '</div><div class="result-text-neg">NÃO FORAM ENCONTRADA(S) INDISPONIBILIDADE(S) GENÉRICA(S) E<br>ESPECÍFICA(S) PARA O DOCUMENTO PESQUISADO</div></div>';
+            // Resultado NEGATIVO — igual ao original
+            htmlRes = `
+            <div class="result-container">
+                <div class="result-icon">${iconNegative}</div>
+                <div class="result-text-neg">
+                    NÃO FORAM ENCONTRADA(S) INDISPONIBILIDADE(S) GENÉRICA(S) E<br>
+                    ESPECÍFICA(S) PARA O DOCUMENTO PESQUISADO
+                </div>
+            </div>`;
         } else {
-            htmlRes = '<div class="result-text-pos">Constam no cadastro da CNIB, as seguintes ocorrências:</div>';
-            htmlRes += '<div class="items-list">';
-            ordersArray.forEach((o) => {
-                htmlRes += '<div class="item-box">' +
-                    '<div class="item-line"><span class="item-label">PROTOCOLO:</span> <span class="item-value">' + hMultiline(o.protocol || '—') + '</span></div>' +
-                    '<div class="item-line"><span class="item-label">NÚMERO DO PROCESSO:</span> <span class="item-value">' + hMultiline(o.processNumber || '—') + '</span></div>' +
-                    '<div class="item-line"><span class="item-label">TIPO:</span> <span class="item-value">' + hMultiline(o.processName || '—') + '</span></div>' +
-                    '<div class="item-line"><span class="item-label">EMISSOR DA ORDEM:</span> <span class="item-value">' + hMultiline(o.organizationLabel || '—') + '</span></div>' +
-                    '</div>';
+            // ── FIX #3: Resultado POSITIVO ─────────────────
+            // Cada indisponibilidade = 1 bloco com os 4 campos empilhados,
+            // largura total, sem grid, sem corte entre páginas.
+            htmlRes = `<p class="result-intro">Constam no cadastro da CNIB, as seguintes ocorrências:</p>`;
+
+            ordersArray.forEach((o, idx) => {
+                // Protocolo: exibe exatamente como vem da API (ex: 201410.0916.00040349-IA-650)
+                const protocolo    = h(o.protocol       || '—');
+                const numProcesso  = h(o.processNumber  || '—');
+                const tipo         = h(o.processName    || '—');
+                // Emissor pode ser longo (vários níveis separados por /)
+                // Quebramos em múltiplas linhas para facilitar leitura
+                const emissores    = (o.organizationLabel || '—').split('/').map(s => s.trim()).filter(Boolean);
+                const emissorHtml  = emissores.map(s => h(s)).join('<br>');
+
+                htmlRes += `
+                <div class="order-block">
+                    <div class="order-number">Indisponibilidade ${idx + 1}</div>
+                    <table class="order-table">
+                        <tr>
+                            <td class="field-label">PROTOCOLO:</td>
+                            <td class="field-value">${protocolo}</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">NÚMERO DO PROCESSO:</td>
+                            <td class="field-value">${numProcesso}</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">TIPO:</td>
+                            <td class="field-value">${tipo}</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">EMISSOR DA ORDEM:</td>
+                            <td class="field-value emissor">${emissorHtml}</td>
+                        </tr>
+                    </table>
+                </div>`;
             });
-            htmlRes += '</div>';
         }
 
+        // ── CSS completo ──────────────────────────────────
         const css = `
-            * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; color: #000; margin: 0; padding: 0; font-size: 9.5pt; line-height: 1.3; background: #fff; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+
+            body {
+                font-family: Arial, sans-serif;
+                color: #000;
+                font-size: 9.5pt;
+                line-height: 1.4;
+                background: #fff;
+            }
+
             @page { margin: 15mm 20mm 20mm 20mm; size: A4; }
-            .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid #000; margin-bottom: 25px; }
-            .logo-cnib { width: 170px; }
-            .logo-onr { width: 150px; }
-            .main-title { font-size: 16pt; font-weight: bold; text-align: left; margin-bottom: 25px; }
-            .sec-header { font-size: 13pt; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 15px; break-after: avoid-page; }
-            .dados-grid { display: flex; margin-bottom: 25px; gap: 30px; }
+
+            /* CABEÇALHO */
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-bottom: 14px;
+                border-bottom: 2px solid #000;
+                margin-bottom: 22px;
+            }
+            .logo-cnib { width: 160px; }
+            .logo-onr  { width: 140px; }
+
+            /* TÍTULO */
+            .main-title {
+                font-size: 15pt;
+                font-weight: bold;
+                margin-bottom: 22px;
+            }
+
+            /* SEÇÃO */
+            .sec-header {
+                font-size: 12pt;
+                font-weight: bold;
+                border-bottom: 1px solid #000;
+                padding-bottom: 4px;
+                margin-bottom: 12px;
+                page-break-after: avoid;
+            }
+
+            /* DADOS PESQUISADOS */
+            .dados-grid {
+                display: flex;
+                gap: 40px;
+                margin-bottom: 22px;
+            }
             .dados-col { flex: 1; }
-            .dados-label { font-size: 8pt; font-weight: bold; text-transform: uppercase; margin-bottom: 3px; }
-            .dados-val { font-size: 10pt; text-transform: uppercase; }
-            .res-label { font-size: 13pt; font-weight: bold; margin-bottom: 20px; }
-            .result-container { display: flex; align-items: center; margin-bottom: 35px; padding-left: 5px; }
-            .result-icon { width: 32px; height: 32px; margin-right: 15px; }
-            .result-text-neg { font-weight: bold; font-size: 11pt; }
-            .result-text-pos { margin-bottom: 20px; font-size: 10pt; }
-            .items-list { margin-bottom: 25px; }
-            .item-box { margin-bottom: 20px; padding: 10px 12px; border: 1px solid #d4d4d4; page-break-inside: auto; break-inside: auto; overflow: visible; }
-            .item-line { margin-bottom: 4px; font-size: 9.5pt; text-transform: uppercase; white-space: normal; }
-            .item-line:last-child { margin-bottom: 0; }
-            .item-label { font-weight: bold; }
-            .item-value { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
-            .legal-text { font-size: 9pt; text-align: justify; margin-bottom: 10px; }
-            .validation-box { border: 1px solid #a0a0a0; border-radius: 5px; padding: 15px; margin-top: 30px; display: flex; align-items: center; page-break-inside: avoid; break-inside: avoid-page; }
-            .qr-wrapper { border-right: 1px solid #a0a0a0; padding-right: 20px; margin-right: 20px; }
-            .qr-code { width: 80px; height: 80px; display: block; }
+            .dados-label {
+                font-size: 8pt;
+                font-weight: bold;
+                text-transform: uppercase;
+                margin-bottom: 2px;
+                color: #444;
+            }
+            .dados-val {
+                font-size: 10.5pt;
+                text-transform: uppercase;
+                font-weight: bold;
+            }
+
+            /* RESULTADO LABEL */
+            .res-label {
+                font-size: 12pt;
+                font-weight: bold;
+                margin-bottom: 18px;
+            }
+
+            /* NEGATIVO */
+            .result-container {
+                display: flex;
+                align-items: center;
+                margin-bottom: 30px;
+                padding: 14px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            .result-icon { margin-right: 14px; flex-shrink: 0; }
+            .result-text-neg { font-weight: bold; font-size: 10.5pt; line-height: 1.5; }
+
+            /* POSITIVO — intro */
+            .result-intro {
+                font-size: 10pt;
+                margin-bottom: 14px;
+            }
+
+            /* POSITIVO — cada bloco de indisponibilidade */
+            .order-block {
+                border: 1px solid #bbb;
+                border-radius: 4px;
+                margin-bottom: 12px;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                overflow: hidden;
+            }
+            .order-number {
+                background: #f0f0f0;
+                font-size: 8.5pt;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                padding: 5px 10px;
+                border-bottom: 1px solid #bbb;
+                color: #333;
+            }
+            .order-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .order-table tr { border-bottom: 1px solid #e8e8e8; }
+            .order-table tr:last-child { border-bottom: none; }
+            .field-label {
+                font-size: 8pt;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #444;
+                white-space: nowrap;
+                vertical-align: top;
+                padding: 6px 8px 6px 10px;
+                width: 1%;
+            }
+            .field-value {
+                font-size: 9.5pt;
+                text-transform: uppercase;
+                vertical-align: top;
+                padding: 6px 10px 6px 4px;
+                word-break: break-word;
+                line-height: 1.5;
+            }
+            /* Emissor tem quebra de linha entre os níveis */
+            .field-value.emissor {
+                text-transform: none;
+                font-size: 9pt;
+                line-height: 1.6;
+            }
+
+            /* INFORMAÇÕES LEGAIS */
+            .legal-text {
+                font-size: 8.5pt;
+                text-align: justify;
+                margin-bottom: 8px;
+                line-height: 1.5;
+            }
+
+            /* VALIDAÇÃO */
+            .validation-box {
+                border: 1px solid #a0a0a0;
+                border-radius: 5px;
+                padding: 14px;
+                margin-top: 24px;
+                display: flex;
+                align-items: center;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .qr-wrapper {
+                border-right: 1px solid #a0a0a0;
+                padding-right: 18px;
+                margin-right: 18px;
+                flex-shrink: 0;
+            }
+            .qr-code { width: 75px; height: 75px; display: block; }
             .val-info { flex: 1; text-align: center; }
-            .val-title { font-weight: bold; font-size: 8.5pt; margin-bottom: 10px; text-transform: none; }
-            .hash-label { font-size: 8pt; margin-bottom: 2px; }
-            .hash-val { font-weight: bold; font-size: 11pt; margin-bottom: 10px; }
-            .url-val { font-size: 7.5pt; color: #000; text-decoration: none; }
-            .footer-table { width: 100%; border: 1px solid #a0a0a0; border-radius: 5px; margin-top: 15px; border-collapse: separate; border-spacing: 0; page-break-inside: avoid; break-inside: avoid-page; }
-            .footer-table td { padding: 10px; font-size: 8pt; vertical-align: top; border-right: 1px solid #a0a0a0; }
+            .val-title { font-weight: bold; font-size: 8pt; margin-bottom: 8px; }
+            .hash-label { font-size: 7.5pt; margin-bottom: 2px; color: #555; }
+            .hash-val { font-weight: bold; font-size: 10.5pt; margin-bottom: 8px; }
+            .url-val { font-size: 7pt; color: #000; text-decoration: none; }
+
+            /* RODAPÉ DA TABELA */
+            .footer-table {
+                width: 100%;
+                border: 1px solid #a0a0a0;
+                border-radius: 4px;
+                margin-top: 12px;
+                border-collapse: separate;
+                border-spacing: 0;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .footer-table td {
+                padding: 9px 10px;
+                font-size: 8pt;
+                vertical-align: top;
+                border-right: 1px solid #a0a0a0;
+            }
             .footer-table td:last-child { border-right: none; }
-            .ft-label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 7.5pt; }
-            .page-footer { display: flex; justify-content: space-between; margin-top: 36px; font-size: 7.5pt; border-top: 1px solid #ccc; padding-top: 10px; page-break-inside: avoid; break-inside: avoid-page; }
+            .ft-label {
+                font-weight: bold;
+                display: block;
+                margin-bottom: 4px;
+                font-size: 7.5pt;
+                color: #444;
+            }
+
+            /* RODAPÉ DE PÁGINA */
+            .page-footer {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 30px;
+                font-size: 7.5pt;
+                border-top: 1px solid #ccc;
+                padding-top: 8px;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
             .footer-right { text-align: right; }
         `;
 
+        // ── HTML completo ─────────────────────────────────
         const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -600,78 +769,127 @@ app.post('/api/pdf-clone', async (req, res) => {
     <style>${css}</style>
 </head>
 <body>
+
+    <!-- Cabeçalho com logos -->
     <div class="header">
-        ${imgCnibBase64 ? `<img src="${imgCnibBase64}" class="logo-cnib">` : ''}
-        ${imgOnrBase64 ? `<img src="${imgOnrBase64}" class="logo-onr">` : ''}
+        ${imgCnibBase64 ? `<img src="${imgCnibBase64}" class="logo-cnib" alt="CNIB">` : '<div style="width:160px;"></div>'}
+        ${imgOnrBase64  ? `<img src="${imgOnrBase64}"  class="logo-onr"  alt="ONR">` : '<div style="width:140px;"></div>'}
     </div>
+
     <div class="main-title">Relatório de Consulta de Indisponibilidade de Bens</div>
+
+    <!-- Dados pesquisados -->
     <div class="sec-header">Dados Pesquisados</div>
     <div class="dados-grid">
-        <div class="dados-col"><div class="dados-label">CPF</div><div class="dados-val">${h(docFormatted)}</div></div>
-        <div class="dados-col"><div class="dados-label">NOME</div><div class="dados-val">${h(nomeAlvo || 'DESCONHECIDO')}</div></div>
+        <div class="dados-col">
+            <div class="dados-label">CPF / CNPJ</div>
+            <div class="dados-val">${h(docFormatted)}</div>
+        </div>
+        <div class="dados-col">
+            <div class="dados-label">Nome / Razão Social</div>
+            <div class="dados-val">${h(nomeAlvo || 'DESCONHECIDO')}</div>
+        </div>
     </div>
+
+    <!-- Resultado -->
     <div class="res-label">Resultado: ${h(status)}</div>
     ${htmlRes}
+
+    <!-- Informações importantes -->
     <div class="sec-header">Informações Importantes</div>
-    <div class="legal-text">Este Relatório foi emitido pela Central Nacional de Indisponibilidade de Bens (CNIB), com base nos artigos 7º e 9º do Provimento CNJ nº 39/2014, de 25/7/2014, da Corregedoria Nacional de Justiça do Conselho Nacional de Justiça (CNJ).</div>
-    <div class="legal-text">A informação negativa não significa inexistência de indisponibilidades anteriormente decretadas, assim como eventuais indisponibilidades relacionadas referem-se apenas às ordens que foram cadastradas a partir das referidas datas. Em caso positivo são indicados os números dos processos de execuções trabalhistas, fiscais e cíveis, bem como os respectivos Tribunais em que tramitam, ressalvadas informações de processos que correm em segredo de justiça e em sigilo de justiça.</div>
-    <div class="legal-text">Os dados constantes deste relatório são de responsabilidade direta dos respectivos órgãos do Poder Judiciário e da Administração Pública que os cadastraram.</div>
-    <div class="legal-text">Para informações mais completas sobre a situação jurídica da pessoa pesquisada deverão ser feitas pesquisas de maior abrangência nos órgãos do Poder Judiciário e da Administração Pública.</div>
+    <p class="legal-text">
+        Este Relatório foi emitido pela Central Nacional de Indisponibilidade de Bens (CNIB), com base nos artigos 7º e 9º
+        do Provimento CNJ nº 39/2014, de 25/7/2014, da Corregedoria Nacional de Justiça do Conselho Nacional de Justiça (CNJ).
+    </p>
+    <p class="legal-text">
+        A informação negativa não significa inexistência de indisponibilidades anteriormente decretadas, assim como eventuais
+        indisponibilidades relacionadas referem-se apenas às ordens que foram cadastradas a partir das referidas datas.
+        Em caso positivo são indicados os números dos processos de execuções trabalhistas, fiscais e cíveis, bem como os
+        respectivos Tribunais em que tramitam, ressalvadas informações de processos que correm em segredo de justiça e em
+        sigilo de justiça. Nessas hipóteses é mantida a informação do resultado positivo, devendo o interessado reportar-se
+        diretamente aos Juízos ou instâncias administrativas competentes que decretaram a indisponibilidade de bens.
+    </p>
+    <p class="legal-text">
+        Os dados constantes deste relatório são de responsabilidade direta dos respectivos órgãos do Poder Judiciário e
+        da Administração Pública que os cadastraram.
+    </p>
+    <p class="legal-text">
+        Para informações mais completas sobre a situação jurídica da pessoa pesquisada deverão ser feitas pesquisas de
+        maior abrangência nos órgãos do Poder Judiciário e da Administração Pública.
+    </p>
+
+    <!-- QR + Hash -->
     <div class="validation-box">
-        <div class="qr-wrapper"><img src="${qrUrl}" class="qr-code"></div>
-        <div class="val-info"><div class="val-title">Validar autenticidade</div><div class="hash-label">Hash:</div><div class="hash-val">${h(hash)}</div><a href="https://indisponibilidade.org.br" class="url-val">https://indisponibilidade.org.br</a></div>
+        <div class="qr-wrapper">
+            <img src="${qrUrl}" class="qr-code" alt="QR Code">
+        </div>
+        <div class="val-info">
+            <div class="val-title">Validar autenticidade</div>
+            <div class="hash-label">Hash:</div>
+            <div class="hash-val">${h(hash)}</div>
+            <a href="https://indisponibilidade.org.br" class="url-val">https://indisponibilidade.org.br</a>
+        </div>
     </div>
-    <table class="footer-table"><tr>
-        <td width="30%"><span class="ft-label">Emitido em:</span>${h(dataHora)}</td>
-        <td width="40%"><span class="ft-label">Responsável pela Consulta:</span>${h(responsavelNome || 'DESCONHECIDO')}</td>
-        <td width="30%"><span class="ft-label">CPF do Responsável:</span>${h(responsavelCPF || '—')}</td>
-    </tr></table>
-    <div class="page-footer"><div>Data e Hora deste Relatório: ${h(dataHora)}<br>https://indisponibilidade.org.br</div><div class="footer-right"><strong>Relatório de Consulta de Indisponibilidade de Bens</strong></div></div>
+
+    <!-- Responsável -->
+    <table class="footer-table">
+        <tr>
+            <td width="30%"><span class="ft-label">Emitido em:</span>${h(dataHora)}</td>
+            <td width="40%"><span class="ft-label">Responsável pela Consulta:</span>${h(responsavelNome || 'DESCONHECIDO')}</td>
+            <td width="30%"><span class="ft-label">CPF do Responsável:</span>${h(responsavelCPF || '—')}</td>
+        </tr>
+    </table>
+
+    <!-- Rodapé -->
+    <div class="page-footer">
+        <div>Data e Hora deste Relatório: ${h(dataHora)}<br>https://indisponibilidade.org.br</div>
+        <div class="footer-right"><strong>Relatório de Consulta de Indisponibilidade de Bens</strong></div>
+    </div>
+
 </body>
 </html>`;
 
-        // Gera PDF via Puppeteer
+        // ── Gera PDF via Puppeteer ────────────────────────
         await page.setContent(html, { waitUntil: 'domcontentloaded' });
-        
-        // Aguarda imagens carregarem (especialmente importante para Base64)
-        try {
-            await page.waitForFunction(() => {
-                const imgs = Array.from(document.querySelectorAll('img'));
-                return imgs.length === 0 || imgs.every(img => img.complete);
-            }, { timeout: 3000 }).catch(() => {
-                console.warn('[PDF-CLONE] ⚠ Timeout esperando imagens, continuando...');
-            });
-        } catch (e) {
-            console.warn('[PDF-CLONE] ⚠ Erro ao aguardar imagens:', e.message);
-        }
-        
+
+        // Aguarda imagens (logos Base64 + QR Code externo)
+        await page.waitForFunction(() => {
+            const imgs = Array.from(document.querySelectorAll('img'));
+            return imgs.every(img => img.complete);
+        }, { timeout: 5000 }).catch(() => {
+            console.warn('[PDF-CLONE] ⚠ Timeout aguardando imagens');
+        });
+
         const pdfBuffer = await page.pdf({
             format: 'A4',
             margin: { top: '15mm', right: '20mm', bottom: '20mm', left: '20mm' },
             printBackground: true,
             displayHeaderFooter: true,
             headerTemplate: '<div></div>',
-            footerTemplate: '<div style="width:100%;font-size:8px;color:#666;padding:0 20mm 6mm 20mm;"><div style="border-top:1px solid #ddd;padding-top:4px;text-align:right;"><span class="pageNumber"></span> / <span class="totalPages"></span></div></div>',
+            footerTemplate: `<div style="width:100%;font-size:7px;color:#888;
+                padding:0 20mm 5mm 20mm;">
+                <div style="border-top:1px solid #ddd;padding-top:3px;text-align:right;">
+                    Página <span class="pageNumber"></span> de <span class="totalPages"></span>
+                </div>
+            </div>`,
             scale: 1,
         });
 
         await page.close();
         browserUseCount++;
 
+        const qtd = ordersArray.length;
+        console.log(`[PDF-CLONE] ✓ PDF gerado — ${qtd} indisponibilidade(s) — ${pdfBuffer.length} bytes`);
+
         res.set('Content-Type', 'application/pdf');
         res.set('Content-Length', pdfBuffer.length);
-        console.log(`[PDF-CLONE] ✓ PDF Clone gerado com ${ordersArray.length} indisponibilidade(s) + 2 logos (${pdfBuffer.length} bytes)`);
         res.send(pdfBuffer);
 
     } catch (err) {
-        console.error(`[PDF-CLONE] ✗ Erro ao gerar: ${err.message}`);
+        console.error(`[PDF-CLONE] ✗ Erro: ${err.message}`);
         console.error(`[PDF-CLONE] Stack: ${err.stack}`);
-        try {
-            await page.close();
-        } catch (e) {
-            // Ignora erro ao fechar página
-        }
-        return res.status(500).json({ 
+        if (page) { try { await page.close(); } catch {} }
+        return res.status(500).json({
             erro: `Falha ao gerar PDF Clone: ${err.message}`,
             details: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
@@ -679,7 +897,7 @@ app.post('/api/pdf-clone', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// Limpeza periódica
+// Limpeza periódica de sessões
 // ═══════════════════════════════════════════════════════════
 setInterval(() => {
     let n = 0;
@@ -690,7 +908,7 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 // ═══════════════════════════════════════════════════════════
-// DOWNLOAD DO AGENTE — serve o pacote cnib-agent-setup.zip
+// DOWNLOAD DO AGENTE
 // ═══════════════════════════════════════════════════════════
 app.get('/cnib-agent-setup.zip', (req, res) => {
     const zipPath = path.join(__dirname, 'cnib-agent-setup.zip');
@@ -705,36 +923,19 @@ app.get('/cnib-agent-setup.zip', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// LOGIN COM CERTIFICADO DIGITAL — arquitetura agente local
-//
-// A VPS NÃO toca no Chrome nem no token.
-// O agente local (agent.js) roda na máquina do usuário,
-// abre o Chrome localmente, captura os cookies e os envia
-// para a VPS via POST /api/cert-login/push-cookies.
-//
-// Fluxo:
-//   1. Frontend clica em "Login com Certificado"
-//   2. VPS cria uma sessão com ID único (pendente)
-//   3. Frontend instrui o usuário a rodar o agente local
-//   4. Agente abre Chrome local → usuário autentica com token
-//   5. Agente captura cookies e envia para VPS com o session ID
-//   6. Frontend em polling detecta os cookies → loga
+// LOGIN COM CERTIFICADO DIGITAL
 // ═══════════════════════════════════════════════════════════
-
 const crypto = require('crypto');
 
-// Sessões pendentes: Map<sessionId, { status, cookies, created }>
 const certSessions = new Map();
 
-// Limpa sessões expiradas a cada 5 minutos
 setInterval(() => {
-    const cutoff = Date.now() - 10 * 60 * 1000; // 10 min
+    const cutoff = Date.now() - 10 * 60 * 1000;
     for (const [id, s] of certSessions) {
         if (s.created < cutoff) certSessions.delete(id);
     }
 }, 5 * 60 * 1000);
 
-// 1. Frontend solicita início de sessão → VPS cria session ID
 app.post('/api/cert-login/start', (req, res) => {
     const sessionId = crypto.randomBytes(16).toString('hex');
     certSessions.set(sessionId, {
@@ -746,7 +947,6 @@ app.post('/api/cert-login/start', (req, res) => {
     res.json({ ok: true, sessionId });
 });
 
-// 2. Agente local envia os cookies capturados para a VPS
 app.post('/api/cert-login/push-cookies', (req, res) => {
     const { sessionId, cookies } = req.body;
 
@@ -765,7 +965,6 @@ app.post('/api/cert-login/push-cookies', (req, res) => {
     res.json({ ok: true });
 });
 
-// 3. Frontend faz polling para saber se os cookies chegaram
 app.get('/api/cert-login/status', (req, res) => {
     const { sessionId } = req.query;
     if (!sessionId) return res.status(400).json({ status: 'error', error: 'sessionId obrigatório' });
@@ -773,7 +972,6 @@ app.get('/api/cert-login/status', (req, res) => {
     const session = certSessions.get(sessionId);
     if (!session) return res.json({ status: 'expired' });
 
-    // Timeout de 5 minutos
     if (Date.now() - session.created > 5 * 60 * 1000 && session.status === 'waiting') {
         certSessions.delete(sessionId);
         return res.json({ status: 'timeout' });
