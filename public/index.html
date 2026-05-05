@@ -24,14 +24,32 @@
   --radius-xs:  6px;
   --trans:      cubic-bezier(0.22,1,0.36,1);
 }
+/* Dark mode: cores semânticas mais saturadas para melhor contraste */
 [data-theme="dark"] {
-  --bg:#0a0a0b;--bg-2:#111114;--surface:#18181c;
-  --glass:rgba(255,255,255,0.04);--glass-b:rgba(255,255,255,0.07);
-  --border:rgba(255,255,255,0.08);--border-h:rgba(255,255,255,0.16);
-  --text:#f0ede8;--text-2:#9a9690;--text-3:#5a5754;
-  --tab-bg:rgba(255,255,255,0.05);--tab-active:rgba(255,255,255,0.10);
-  --input-bg:rgba(0,0,0,0.35);--card-bg:rgba(255,255,255,0.03);
-  --shadow:0 8px 40px rgba(0,0,0,0.6);--shadow-sm:0 2px 12px rgba(0,0,0,0.4);
+  --red:        #f06565;
+  --red-dim:    rgba(240,101,101,0.13);
+  --green:      #4de89e;
+  --green-dim:  rgba(77,232,158,0.11);
+  --blue:       #74aef8;
+  --blue-dim:   rgba(116,174,248,0.13);
+  --amber:      #e0b55a;
+  --amber-glow: rgba(224,181,90,0.15);
+}
+[data-theme="dark"] {
+  /* Fundos — cinza médio-escuro, não preto absoluto */
+  --bg:#161719;--bg-2:#1c1e21;--surface:#222427;
+  /* Superfícies de cards e glass — visíveis sobre o fundo */
+  --glass:rgba(255,255,255,0.055);--glass-b:rgba(255,255,255,0.09);
+  /* Bordas — mais visíveis sem brutalidade */
+  --border:rgba(255,255,255,0.11);--border-h:rgba(255,255,255,0.24);
+  /* Texto — hierarquia clara: primário quase branco, secundário legível, terciário visível */
+  --text:#f2f0ec;--text-2:#b0ada8;--text-3:#787470;
+  /* Tabs */
+  --tab-bg:rgba(255,255,255,0.06);--tab-active:rgba(255,255,255,0.12);
+  /* Inputs e cards */
+  --input-bg:#1a1c1f;--card-bg:rgba(255,255,255,0.045);
+  /* Sombras mais suaves num fundo não-preto */
+  --shadow:0 8px 32px rgba(0,0,0,0.45);--shadow-sm:0 2px 10px rgba(0,0,0,0.3);
 }
 [data-theme="light"] {
   --bg:#f5f4f0;--bg-2:#ebe9e3;--surface:#ffffff;
@@ -45,8 +63,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-weight:300;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;transition:background .3s,color .3s;}
-[data-theme="dark"] body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(212,168,75,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(212,168,75,0.03) 0%,transparent 55%);}
-[data-theme="dark"] body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");background-size:180px;opacity:0.5;}
+[data-theme="dark"] body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(212,168,75,0.07) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(212,168,75,0.04) 0%,transparent 55%);}
+[data-theme="dark"] body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");background-size:180px;opacity:0.35;}
 
 .app{position:relative;z-index:1;width:100%;max-width:1080px;padding:40px 20px 80px;display:flex;flex-direction:column;align-items:center;gap:28px;}
 
@@ -156,11 +174,11 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .result-negative{background:var(--card-bg);border:1px solid rgba(61,214,140,.12);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column;gap:16px;}
 .check-circle{width:48px;height:48px;border-radius:50%;background:var(--green-dim);border:1px solid rgba(61,214,140,.25);display:grid;place-items:center;flex-shrink:0;}
 .check-circle svg{color:var(--green);width:22px;}
-.neg-msg{font-size:13px;color:var(--text-3);line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
+.neg-msg{font-size:13px;color:var(--text-2);line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
 
 /* TOOLBAR */
 .result-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-.result-toolbar .count-text{font-size:13px;color:var(--text-3);flex:1;}
+.result-toolbar .count-text{font-size:13px;color:var(--text-2);flex:1;}
 .result-toolbar .count-text strong{color:var(--text);font-weight:500;}
 .view-toggle{display:flex;background:var(--tab-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px;gap:3px;}
 .view-toggle button{padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:400;color:var(--text-3);background:none;transition:all .2s;display:flex;align-items:center;gap:5px;}
@@ -189,18 +207,19 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 /* ORDER CARD — full width row layout */
 .order-card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .25s,box-shadow .25s;width:100%;}
 .order-card:hover{border-color:var(--border-h);box-shadow:var(--shadow-sm);}
-.order-card-top{padding:10px 16px 9px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;}
-[data-theme="light"] .order-card-top{background:rgba(0,0,0,.04);}
+.order-card-top{padding:10px 16px 9px;background:var(--card-top-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;}
+[data-theme="dark"] .order-card-top{--card-top-bg:rgba(255,255,255,0.04);}
+[data-theme="light"] .order-card-top{--card-top-bg:rgba(0,0,0,.04);}
 .protocol-lbl{font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:2px;}
 .protocol-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--text);word-break:break-all;line-height:1.4;}
-.date-lbl{font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);text-align:right;margin-bottom:2px;}
+.date-lbl{font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);text-align:right;margin-bottom:2px;}
 .date-val{font-size:10.5px;color:var(--text-2);text-align:right;white-space:nowrap;}
 
 /* ORDER CARD BODY — horizontal layout for wide cards */
 .order-card-body{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 20px;}
 @media(max-width:700px){.order-card-body{grid-template-columns:1fr 1fr;}}
 @media(max-width:480px){.order-card-body{grid-template-columns:1fr;}}
-.ofield-lbl{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:3px;}
+.ofield-lbl{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);margin-bottom:3px;}
 .ofield-val{font-size:12px;color:var(--text);line-height:1.5;word-break:break-word;}
 /* Emissor da ordem gets full width since it's usually very long */
 .ofield-emissor{grid-column:1/-1;}
@@ -213,7 +232,7 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .loading-block{padding:48px 0;display:none;flex-direction:column;align-items:center;gap:14px;}
 .loading-block.show{display:flex;}
 .loader-ring{width:38px;height:38px;border:2px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .9s linear infinite;}
-.loading-block p{font-size:13px;color:var(--text-3);letter-spacing:.05em;}
+.loading-block p{font-size:13px;color:var(--text-2);letter-spacing:.05em;}
 
 /* AUTH */
 .auth-wrap{width:100%;max-width:520px;margin:0 auto;}
@@ -230,10 +249,10 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .multi-queue::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;}
 .queue-item{display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;transition:border-color .2s;}
 .queue-item:hover{border-color:var(--border-h);}
-.queue-item .q-order{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);flex-shrink:0;min-width:56px;}
+.queue-item .q-order{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-2);flex-shrink:0;min-width:56px;}
 .queue-item .q-doc{font-family:'DM Mono',monospace;font-size:12px;color:var(--amber);flex-shrink:0;}
 .queue-item .q-name{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
-.queue-item .q-remove{margin-left:auto;color:var(--text-3);cursor:pointer;flex-shrink:0;transition:color .2s;}
+.queue-item .q-remove{margin-left:auto;color:var(--text-2);cursor:pointer;flex-shrink:0;transition:color .2s;}
 .queue-item .q-remove:hover{color:var(--red);}
 .queue-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:100px;}
 .queue-status.pending{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(91,156,246,.2);}
@@ -272,13 +291,13 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .history-item:hover{border-color:var(--border-h);}
 .hist-doc{font-family:'DM Mono',monospace;font-size:13px;color:var(--amber);flex-shrink:0;}
 .hist-name{font-size:13px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hist-time{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);flex-shrink:0;}
+.hist-time{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-2);flex-shrink:0;}
 .hist-actions{display:flex;gap:6px;flex-shrink:0;}
 .hist-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:100px;flex-shrink:0;}
 .hist-badge.neg{background:var(--green-dim);color:var(--green);border:1px solid rgba(61,214,140,.2);}
 .hist-badge.pos{background:var(--red-dim);color:var(--red);border:1px solid rgba(224,82,82,.2);}
-.hist-empty{text-align:center;padding:40px 0;color:var(--text-3);font-size:14px;}
-.expiry-note{font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:6px;}
+.hist-empty{text-align:center;padding:40px 0;color:var(--text-2);font-size:14px;}
+.expiry-note{font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:6px;}
 .expiry-note svg{color:var(--amber);width:13px;height:13px;}
 
 /* MODAL */
@@ -295,9 +314,9 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 
 /* MISC */
 .divider{height:1px;background:var(--border);width:100%;margin:4px 0;}
-.info-strip{width:100%;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--text-3);padding:12px 16px;background:var(--glass);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.info-strip{width:100%;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--text-2);padding:12px 16px;background:var(--glass);border:1px solid var(--border);border-radius:var(--radius-sm);}
 .info-strip svg{color:var(--amber);flex-shrink:0;width:14px;height:14px;}
-.footer{font-size:11px;color:var(--text-3);text-align:center;letter-spacing:.05em;}
+.footer{font-size:11px;color:var(--text-2);text-align:center;letter-spacing:.05em;}
 
 /* ANIMATIONS */
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -329,7 +348,7 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .session-expired-icon{width:52px;height:52px;border-radius:50%;background:var(--red-dim);border:1px solid rgba(224,82,82,.3);display:grid;place-items:center;margin:0 auto 16px;}
 .session-expired-icon svg{color:var(--red);width:22px;}
 .session-expired-title{font-family:'DM Serif Display',serif;font-size:20px;color:var(--text);margin-bottom:8px;}
-.session-expired-msg{font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:22px;}
+.session-expired-msg{font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:22px;}
 .expired-countdown{font-family:'DM Mono',monospace;font-size:13px;color:var(--amber);margin-top:12px;}
 .hidden{display:none!important;}
 
@@ -341,11 +360,11 @@ textarea{resize:none;font-family:'DM Mono',monospace;font-size:12.5px;min-height
 .cert-login-btn .cert-icon svg{width:15px;height:15px;}
 .cert-login-btn .cert-text{flex:1;}
 .cert-login-btn .cert-title{font-size:13px;font-weight:500;color:var(--text);line-height:1.3;}
-.cert-login-btn .cert-sub{font-size:11px;color:var(--text-3);margin-top:1px;}
+.cert-login-btn .cert-sub{font-size:11px;color:var(--text-2);margin-top:1px;}
 .cert-login-btn .cert-spin{width:15px;height:15px;flex-shrink:0;border:2px solid rgba(91,156,246,.25);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;display:none;}
 .cert-login-btn.loading .cert-spin{display:block;}
 .cert-login-btn.loading .cert-arrow{display:none;}
-.cert-arrow{color:var(--text-3);flex-shrink:0;}
+.cert-arrow{color:var(--text-2);flex-shrink:0;}
 .cert-arrow svg{width:15px;height:15px;}
 
 /* CERT WAITING MODAL */
@@ -1609,23 +1628,52 @@ async function mlRun() {
           statusEl.innerHTML = '<span class="qs-spin"></span>Gerando PDF...';
         }
 
+        // Aguarda a sessão Blazor ser criada no servidor antes de começar a polear.
+        // O /api/consultar dispara popularSessaoBlazor em background — precisamos
+        // dar tempo para ela registrar o status 'running' antes do primeiro poll,
+        // caso contrário o servidor retorna 'not_started' e pulamos o PDF.
+        await delay(2500);
+
         let pdfReady = false;
-        for (let t=0; t<35; t++) {
-          await delay(1000);
-          const sr = await fetch('/api/pdf/status', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cookies}) });
+        let notStartedStreak = 0;
+
+        for (let t = 0; t < 45; t++) {
+          const sr = await fetch('/api/pdf/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cookies })
+          });
           const sd = await sr.json();
-          if (sd.status==='ready') { pdfReady=true; break; }
-          if (sd.status==='error') break;
+
+          if (sd.status === 'ready') {
+            pdfReady = true;
+            break;
+          }
+          if (sd.status === 'error') break;
+
+          if (sd.status === 'not_started') {
+            notStartedStreak++;
+            // Se ficou 6s seguidos sem sessão aparecer, desiste
+            if (notStartedStreak >= 6) break;
+          } else {
+            notStartedStreak = 0; // 'preparing' ou 'running' — reseta streak
+          }
+
+          await delay(1000);
         }
 
         if (pdfReady) {
-          const pdfRes = await fetch('/api/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cookies}) });
+          const pdfRes = await fetch('/api/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cookies })
+          });
           if (pdfRes.ok) {
-            const pdfBlob   = await pdfRes.blob();
-            const nomeFile  = nomeAPI.toUpperCase().replace(/[^A-Z0-9\s]/g,'').trim();
-            const docFile   = docForFilename(item.raw);
-            const filename  = `${item.pedido} - ${resultado} - ${nomeFile} - ${docFile} - Feito por ${feitoPor}.pdf`;
-            const fileHandle = await STATE.selectedFolderHandle.getFileHandle(filename, {create:true});
+            const pdfBlob  = await pdfRes.blob();
+            const nomeFile = nomeAPI.toUpperCase().replace(/[^A-Z0-9\s]/g, '').trim();
+            const docFile  = docForFilename(item.raw);
+            const filename = `${item.pedido} - ${resultado} - ${nomeFile} - ${docFile} - Feito por ${feitoPor}.pdf`;
+            const fileHandle = await STATE.selectedFolderHandle.getFileHandle(filename, { create: true });
             const writable   = await fileHandle.createWritable();
             await writable.write(pdfBlob);
             await writable.close();
